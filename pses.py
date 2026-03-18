@@ -120,11 +120,11 @@ def anchor_positional_encoding(hypergraph: xgi.Hypergraph, anchor_nodes, iterati
         Positional encoding tensor
     """
     incidence_matrix = xgi.convert.to_incidence_matrix(hypergraph)
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    incidence_matrix.to(device)
 
     transition_mat = coo2Sparse(hypergraph_random_walk(incidence_matrix))
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    transition_mat = transition_mat.to(device)
     
     if len(anchor_nodes) == 0:
         print("No anchor nodes provided, returning zero positional encoding")
@@ -138,13 +138,13 @@ def anchor_positional_encoding(hypergraph: xgi.Hypergraph, anchor_nodes, iterati
         indicies, 
         values, 
         size=(transition_mat.shape[0], len(anchor_nodes))
-    )
+    ).to(device)
     
     # Perform random walk for specified iterations
     for _ in range(iterations):
         anchor_node = transition_mat @ anchor_node
 
-    return torch.tensor(anchor_node)
+    return anchor_node.to_dense().cpu()
 
 
 def arnoldi_encoding(hypergraph: xgi.Hypergraph, k: int, smallestOnly=True):
