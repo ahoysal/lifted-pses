@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=sweep
+#SBATCH --job-name=experiment
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -12,8 +12,10 @@
 
 set -euo pipefail
 
+OUTERRFILES="results/${SLURM_JOB_ID}"
+
 # Create output directories if they don't exist
-mkdir -p results/out results/err
+mkdir -p "${OUTERRFILES}"
 
 # -----------------------------------------------------------------------------
 # Environment setup
@@ -62,5 +64,4 @@ if python3 -c 'import torch; exit(0 if torch.cuda.is_available() else 1)' 2>/dev
 fi
 echo ""
 
-python3 sweep.py
-
+python3 -u experiment.py
