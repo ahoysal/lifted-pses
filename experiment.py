@@ -14,10 +14,13 @@ def runExperiement(cfg : configs.Configs):
     import torch_geometric.transforms as T
     import torch.nn.functional as F
     def transform(data):
-        # lifted = liftings.makeHGFormanRicci(data)
-        # T.AddRandomWalkPE(walk_length=cfg.rwpe_len)(data)
+        data.x = data.x.float()
+
+        # return data
+
+        # return liftings.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len)
+        return liftings.addLaplacianPE(data, cfg.rwpe_anchors)
         lifted = liftings.makeHG(data)
-        # data.x = data.x.float()
         
         num_anchors = min(cfg.rwpe_anchors, lifted.num_nodes)
         anchor_nodes = np.random.choice(lifted.num_nodes, num_anchors, replace=False)
@@ -27,6 +30,7 @@ def runExperiement(cfg : configs.Configs):
             pse = F.pad(pse, (0, padding_size, 0, 0), "constant", 0)
         
         data.x = torch.cat([data.x, pse], dim=1)
+
         # data.pse = pse
         return data
 
@@ -44,6 +48,8 @@ def runExperiement(cfg : configs.Configs):
     #      attn_type="performer",
     #      attn_kwargs=None
     # )
+
+    print("LapPE Transformer")
     model = models.GraphNodeTransformer(
         in_dim=trainDataset.num_features,
         d_model=cfg.embedded,
@@ -52,6 +58,8 @@ def runExperiement(cfg : configs.Configs):
         out_dim=trainDataset.num_classes,
         dropout=cfg.dropout
     )
+
+    # print("RWPE GCN")
     # model = models.GCN(
     #     in_channels=trainDataset.num_features,
     #     hidden_channels=cfg.embedded,
@@ -68,6 +76,6 @@ if __name__ == '__main__':
     
     # cfg.layers = 3
     # cfg.embedded = 754
-    cfg.rwpe_anchors = 20
+    # cfg.rwpe_anchors = 20
     print("params: embedded: %d, heads: %d, layers: %d, dropout: %f, epochs: %d, rwpe_anchors: %d, rwpe_len: %d" % (cfg.embedded, cfg.heads, cfg.layers, cfg.dropout, cfg.epochs, cfg.rwpe_anchors, cfg.rwpe_len))
     runExperiement(cfg)

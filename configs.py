@@ -3,13 +3,13 @@ import argparse
 class Configs():
     def __init__(self) -> None:
         self.embedded = 128
-        self.heads = 1
-        self.layers = 4
+        self.heads = 2
+        self.layers = 2
         self.dropout = 0.2
         self.epochs = 100
 
-        self.rwpe_anchors = 100
-        self.rwpe_len = 5
+        self.rwpe_anchors = 20
+        self.rwpe_len = 3
 
 def parseMessages():
     parser = argparse.ArgumentParser(description="")
