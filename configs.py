@@ -3,7 +3,7 @@ import argparse
 class Configs():
     def __init__(self) -> None:
         self.embedded = 128
-        self.heads = 4
+        self.heads = 1
         self.layers = 4
         self.dropout = 0.2
         self.epochs = 100

@@ -19,6 +19,6 @@ for layer in LAYERS:
                 cfg.rwpe_anchors = anchor
                 for len in LEN:
                     cfg.rwpe_len = len
-                    print("START", layer, dropout, epoch, anchor, len)
+                    print("START (layers: %d, dropout: %f, epochs: %d, anchors: %d, len: %d)" % (layer, dropout, epoch, anchor, len))
                     experiment.runExperiement(cfg)
-                    print("END", layer, dropout, epoch, anchor, len)
+                    print("END (layers: %d, dropout: %f, epochs: %d, anchors: %d, len: %d)" % (layer, dropout, epoch, anchor, len))

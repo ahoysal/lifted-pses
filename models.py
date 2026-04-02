@@ -12,6 +12,37 @@ from torch.nn import (
 
 from torch_geometric.nn import GINEConv, GPSConv, global_add_pool, global_mean_pool
 from torch_geometric.nn.attention import PerformerAttention
+from torch_geometric.nn.models import GCN as BaseGCN
+
+class GCN(BaseGCN):
+    def __init__(self, *args, **kwargs):
+        """
+        Args:
+            in_dim: Input feature size (F)
+            d_model: Internal transformer dimension
+            nhead: Number of attention heads
+            num_layers: Number of transformer encoder layers
+            out_dim: Output dimension (defaults to d_model if None)
+        """
+        super().__init__(*args, **kwargs)
+
+    def forward(self, data):
+        """
+        Args:
+            data: 
+                data.x: Tensor of shape [N, F] representing N nodes with F features.
+                (optional) data.batch: if None or doesn't exist, no pooling. else pool
+        Returns:
+            Tensor of shape [N, out_dim]
+        """
+        batching = hasattr(data, "batch") and data.batch is not None
+
+        x = super().forward(data.x, data.edge_index, batch=data.batch if batching else None)
+
+        if batching:
+            x = global_mean_pool(x, data.batch)
+        
+        return x
 
 class GraphNodeTransformer(nn.Module):
     def __init__(self, in_dim, d_model, nhead, num_layers, out_dim=None, dropout=0.1):
@@ -38,10 +69,12 @@ class GraphNodeTransformer(nn.Module):
         # 3. Output Projection
         self.output_proj = nn.Linear(d_model, out_dim if out_dim else d_model)
 
-    def forward(self, x, batch=None):
+    def forward(self, data):
         """
         Args:
-            x: Tensor of shape [N, F] representing N nodes with F features.
+            data: 
+                data.x: Tensor of shape [N, F] representing N nodes with F features.
+                (optional) data.batch: if None or doesn't exist, no pooling. else pool
         Returns:
             Tensor of shape [N, out_dim]
         """
@@ -49,19 +82,19 @@ class GraphNodeTransformer(nn.Module):
         # x = x.unsqueeze(0)
         
         # Project and Transform
-        x = self.input_proj(x)
+        x = self.input_proj(data.x)
         x = self.transformer(x)
         x = self.output_proj(x)
 
-        if batch is not None:
-            x = global_mean_pool(x, batch)
+        if hasattr(data, "batch") and data.batch is not None:
+            x = global_mean_pool(x, data.batch)
         
         # Remove fake batch dimension: [1, N, d_model] -> [N, d_model]
         # x = x.squeeze(0)
         
         return x
     
-
+# currently in a funky state, do not use...
 class GPS(torch.nn.Module):
     def __init__(self, channels: int, pe_dim: int, num_layers: int,
                  attn_type: str, attn_kwargs: dict[str, any]):
@@ -94,15 +127,27 @@ class GPS(torch.nn.Module):
             self.convs,
             redraw_interval=1000 if attn_type == 'performer' else None)
 
-    def forward(self, x, pe, edge_index, edge_attr, batch):
-        x_pe = self.pe_norm(pe)
+    def forward(self, data):
+        """
+        NOTE: 
+        data must have attributes
+            x
+            pe
+            edge_index
+            edge_attr
+        and optionally:
+            batch
+        """
+
+        x_pe = self.pe_norm(data.pe)
         # x = torch.cat((self.node_emb(x.squeeze(-1)), self.pe_lin(x_pe)), 1)
-        x = torch.cat((x.squeeze(-1), self.pe_lin(x_pe)), 1)
+        x = torch.cat((data.x.squeeze(-1), self.pe_lin(x_pe)), 1)
         # edge_attr = self.edge_emb(edge_attr)
 
         for conv in self.convs:
-            x = conv(x, edge_index, batch, edge_attr=edge_attr)
-        x = global_add_pool(x, batch)
+            x = conv(x, data.edge_index, data.batch, edge_attr=data.edge_attr)
+        x = global_add_pool(x, data.batch)
+
         return self.mlp(x)
     
 
