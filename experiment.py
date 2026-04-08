@@ -18,13 +18,13 @@ def runExperiement(cfg : configs.Configs):
 
         # return data
 
-        # return liftings.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len)
-        return liftings.addLaplacianPE(data, cfg.rwpe_anchors)
-        lifted = liftings.makeHG(data)
+        # return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len)
+        # return pses.addLaplacianPE(data, cfg.rwpe_anchors)
+        # lifted = liftings.makeHG(data)
         
-        num_anchors = min(cfg.rwpe_anchors, lifted.num_nodes)
-        anchor_nodes = np.random.choice(lifted.num_nodes, num_anchors, replace=False)
-        pse = pses.anchor_positional_encoding(lifted, anchor_nodes, cfg.rwpe_len)
+        num_anchors = min(cfg.rwpe_anchors, data.num_nodes)
+        anchor_nodes = np.random.choice(data.num_nodes, num_anchors, replace=False)
+        pse = pses.anchor_positional_encoding(data, anchor_nodes, cfg.rwpe_len)
         if num_anchors < cfg.rwpe_anchors:
             padding_size = cfg.rwpe_anchors - num_anchors
             pse = F.pad(pse, (0, padding_size, 0, 0), "constant", 0)

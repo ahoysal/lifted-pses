@@ -4,43 +4,6 @@ import networkx as nx
 import xgi
 import numpy as np
 
-import torch
-import torch_geometric.transforms as T
-import torch.nn.functional as F
-
-def addLaplacianPE(data, PElen):
-    totalNodes = data.x.shape[-2]
-    trueLen = min(PElen, totalNodes - 1)
-
-    data = T.AddLaplacianEigenvectorPE(k=trueLen, attr_name="lapPE")(data)
-    trueLen = data.lapPE.shape[-1]
-
-    if trueLen < PElen:
-        padding_size = PElen - trueLen
-        data.lapPE = F.pad(data.lapPE, (0, padding_size, 0, 0), "constant", 0)
-    
-    data.x = torch.cat([data.x, data.lapPE], dim=1)
-
-    return data
-
-def addRWPE(data, PElen, walkLen):
-    totalNodes = data.x.shape[-2]
-    trueLen = min(PElen, totalNodes - 1)
-
-    data = T.AddRandomWalkPE(walk_length=walkLen, attr_name="RWPE")(data)
-    trueLen = data.RWPE.shape[-1]
-
-    if trueLen < PElen:
-        padding_size = PElen - trueLen
-        data.RWPE = F.pad(data.RWPE, (0, padding_size, 0, 0), "constant", 0)
-    elif trueLen > PElen:
-        data.RWPE = data.RWPE[..., :PElen]
-    
-    data.x = torch.cat([data.x, data.RWPE], dim=1)
-
-    return data
-
-
 def find3Cliques(nxg : nx.Graph):
     triangles = []
     for edge in nxg.edges():
