@@ -71,6 +71,7 @@ def runExperiement(cfg : configs.Configs):
     
     print("Summary: mean %f, stddev %f." % (metrics.mean(), metrics.std()))
     print("\t", metrics)
+    return metrics
 
 if __name__ == '__main__':
     cfg = configs.Configs()
