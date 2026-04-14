@@ -11,32 +11,24 @@ import configs
 
 def runExperiement(cfg : configs.Configs):
     # lift and do positional structural encodings
-    import torch_geometric.transforms as T
-    import torch.nn.functional as F
     def transform(data):
-        data.x = data.x.float()
+        if not hasattr(data, 'x') or data.x is None:
+            data.x = torch.zeros((data.num_nodes,0))
 
-        # return data
-
-        # return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len)
-        # return pses.addLaplacianPE(data, cfg.rwpe_anchors)
-        # lifted = liftings.makeHG(data)
-        
-        num_anchors = min(cfg.rwpe_anchors, data.num_nodes)
-        anchor_nodes = np.random.choice(data.num_nodes, num_anchors, replace=False)
-        pse = pses.anchor_positional_encoding(data, anchor_nodes, cfg.rwpe_len)
-        if num_anchors < cfg.rwpe_anchors:
-            padding_size = cfg.rwpe_anchors - num_anchors
-            pse = F.pad(pse, (0, padding_size, 0, 0), "constant", 0)
-        
-        data.x = torch.cat([data.x, pse], dim=1)
-
-        # data.pse = pse
-        return data
+        match cfg.pseType:
+            case "RWPE":
+                return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, data)
+            case "LapPE":
+                return pses.addLaplacianPE(data, cfg.rwpe_anchors)
+            case "RWPELifted":
+                lifted = liftings.makeHG(data)
+                return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
+            case "None", _:
+                return data
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_lrgb(transform=transform)
+    dataset = datasets.load_csl(transform=transform)
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
@@ -49,27 +41,36 @@ def runExperiement(cfg : configs.Configs):
     #      attn_kwargs=None
     # )
 
-    print("LapPE Transformer")
-    model = models.GraphNodeTransformer(
-        in_dim=trainDataset.num_features,
-        d_model=cfg.embedded,
-        nhead=cfg.heads,
-        num_layers=cfg.layers,
-        out_dim=trainDataset.num_classes,
-        dropout=cfg.dropout
-    )
+    metrics = np.empty(5)
+    for i in range(cfg.trials):
+        print("Trial %d:" % i)
+        match cfg.modelType:
+            case "Transformer":
+                model = models.GraphNodeTransformer(
+                    in_dim=trainDataset.num_features,
+                    d_model=cfg.embedded,
+                    nhead=cfg.heads,
+                    num_layers=cfg.layers,
+                    out_dim=trainDataset.num_classes,
+                    dropout=cfg.dropout
+                )
+            case "GCN":
+                model = models.GCN(
+                    in_channels=trainDataset.num_features,
+                    hidden_channels=cfg.embedded,
+                    num_layers=cfg.layers,
+                    out_channels=trainDataset.num_classes,
+                    dropout=cfg.dropout
+                )
+            case _:
+                print("No model type specified! Exiting.")
+                return
 
-    # print("RWPE GCN")
-    # model = models.GCN(
-    #     in_channels=trainDataset.num_features,
-    #     hidden_channels=cfg.embedded,
-    #     num_layers=cfg.layers,
-    #     out_channels=trainDataset.num_classes,
-    #     dropout=cfg.dropout
-    # )
-
-    print("Training... (%d parameters)" % (sum(p.numel() for p in model.parameters() if p.requires_grad)))
-    training.train(model, dataset, cfg.epochs)
+        print("Training... (%d parameters)" % (sum(p.numel() for p in model.parameters() if p.requires_grad)))
+        metrics[i] = training.train(model, dataset, cfg.epochs)
+    
+    print("Summary: mean %f, stddev %f." % (metrics.mean(), metrics.std()))
+    print("\t", metrics)
 
 if __name__ == '__main__':
     cfg = configs.Configs()

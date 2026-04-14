@@ -21,8 +21,8 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
     testLoader = DataLoader(trainDataset if masked else dataset["test"], batch_size=32, shuffle=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    # lossFunction = torch.nn.CrossEntropyLoss()
-    lossFunction = torch.nn.BCEWithLogitsLoss()
+    lossFunction = torch.nn.CrossEntropyLoss()
+    # lossFunction = torch.nn.BCEWithLogitsLoss()
 
     for epoch in range(epochs):
         model.train()
@@ -120,3 +120,5 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
         # Calculate AP on the entire validation set at once
         metric = average_precision_score(full_targets, full_preds)
         print(f"Final Test AP: {metric:.4f}")
+    
+    return metric

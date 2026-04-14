@@ -251,7 +251,8 @@ def addLaplacianPE(data, PElen):
 
     return data
 
-def addRWPE(data, PElen, walkLen):
+# NOTE: mostly obsolete.
+def addRWPEToSelf(data, PElen, walkLen):
     totalNodes = data.x.shape[-2]
     trueLen = min(PElen, totalNodes - 1)
 
@@ -266,4 +267,20 @@ def addRWPE(data, PElen, walkLen):
     
     data.x = torch.cat([data.x, data.RWPE], dim=1)
 
+    return data
+
+def _randomWalk(rwpe_anchors : int, num_nodes : int, rw_len, graph : xgi.Hypergraph | Data):
+    num_anchors = min(rwpe_anchors, num_nodes)
+    anchor_nodes = np.random.choice(num_nodes, num_anchors, replace=False)
+    pse = anchor_positional_encoding(graph, anchor_nodes, rw_len)
+    if num_anchors < rwpe_anchors:
+        padding_size = rwpe_anchors - num_anchors
+        pse = F.pad(pse, (0, padding_size, 0, 0), "constant", 0)
+    
+    return pse
+
+def addRWPE(data, rw_anchors, rw_len, over):
+    data.x = data.x.float()
+    pse = _randomWalk(rw_anchors, data.num_nodes, rw_len, over)
+    data.x = torch.cat([data.x, pse], dim=1)
     return data

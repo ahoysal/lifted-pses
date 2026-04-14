@@ -9,3 +9,10 @@ def load_lrgb(transform):
         "test": geom_datasets.LRGBDataset(root="data/", name="Peptides-func", split="test", pre_transform=transform, force_reload=False),
         "val": geom_datasets.LRGBDataset(root="data/", name="Peptides-func", split="val", pre_transform=transform, force_reload=False),
     }
+
+def load_csl(transform):
+    return {
+        "train": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="train", pre_transform=transform, force_reload=True),
+        "test": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="test", pre_transform=transform, force_reload=False),
+        "val": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="val", pre_transform=transform, force_reload=False),
+    }
