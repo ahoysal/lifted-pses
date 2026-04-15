@@ -10,7 +10,7 @@ from torch.nn import (
     Sequential,
 )
 
-from torch_geometric.nn import GINEConv, GPSConv, global_add_pool, global_mean_pool
+from torch_geometric.nn import GINEConv, GPSConv, global_add_pool, global_mean_pool, global_max_pool
 from torch_geometric.nn.attention import PerformerAttention
 from torch_geometric.nn.models import GCN as BaseGCN
 
@@ -40,7 +40,7 @@ class GCN(BaseGCN):
         x = super().forward(data.x, data.edge_index, batch=data.batch if batching else None)
 
         if batching:
-            x = global_mean_pool(x, data.batch)
+            x = global_add_pool(x, data.batch)
         
         return x
 
@@ -87,7 +87,7 @@ class GraphNodeTransformer(nn.Module):
         x = self.output_proj(x)
 
         if hasattr(data, "batch") and data.batch is not None:
-            x = global_mean_pool(x, data.batch)
+            x = global_add_pool(x, data.batch)
         
         # Remove fake batch dimension: [1, N, d_model] -> [N, d_model]
         # x = x.squeeze(0)

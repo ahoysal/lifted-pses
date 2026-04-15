@@ -34,4 +34,7 @@ run("GCN", "RWPE")
 run("GCN", "LapPE")
 run("GCN", "RWPELifted")
 
+run("GCN", "None")
+run("Transformer", "None")
+
 printStats(final)

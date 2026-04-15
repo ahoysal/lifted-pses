@@ -13,6 +13,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
     best = (0, None)
 
     masked = not isinstance(dataset, dict)
+    multilabel = False # TODO: infer/pass this in
 
     # create a loader for batching
     trainDataset = dataset if masked else dataset["train"]
@@ -21,7 +22,8 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
     testLoader = DataLoader(trainDataset if masked else dataset["test"], batch_size=32, shuffle=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    lossFunction = torch.nn.CrossEntropyLoss()
+
+    lossFunction = torch.nn.BCEWithLogitsLoss() if multilabel else torch.nn.CrossEntropyLoss()
     # lossFunction = torch.nn.BCEWithLogitsLoss()
 
     for epoch in range(epochs):
@@ -48,7 +50,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
         # --- Test/Evaluation Step ---
         model.eval()
         
-        if masked:
+        if not multilabel:
             total_correct = 0
             total_test_nodes = 0
         else:
@@ -60,17 +62,17 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
                 data = data.to(device)
 
                 out = model(data)
-                if masked:
+                if not multilabel:
                     pred = out.argmax(dim=1)
-                    test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
+                    test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum() if masked else (pred == data.y).sum()
 
                     total_correct += test_correct.item()
-                    total_test_nodes += data.test_mask.sum().item()
+                    total_test_nodes += (data.test_mask if masked else data.y).sum().item()
                 else:
                     all_preds.append(out.detach().cpu().numpy())
                     all_targets.append(data.y.cpu().numpy())
 
-        if masked:
+        if not multilabel:
             metric = total_correct / total_test_nodes
             print(f"Epoch {epoch+1:03d} | Loss: {total_loss:.4f} | Val Acc: {metric:.4f}")
         else:
@@ -99,17 +101,17 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
             data = data.to(device)
 
             out = model(data)
-            if masked:
+            if not multilabel:
                 pred = out.argmax(dim=1)
-                test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
+                test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum() if masked else (pred == data.y).sum()
 
                 total_correct += test_correct.item()
-                total_test_nodes += data.test_mask.sum().item()
+                total_test_nodes += (data.test_mask if masked else data.y).sum().item()
             else:
                 all_preds.append(out.detach().cpu().numpy())
                 all_targets.append(data.y.cpu().numpy())
 
-    if masked:
+    if not multilabel:
         metric = total_correct / total_test_nodes
         print(f"Final Test Acc: {metric:.4f}")
     else:
