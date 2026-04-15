@@ -13,7 +13,7 @@ def runExperiement(cfg : configs.Configs):
     # lift and do positional structural encodings
     def transform(data):
         if not hasattr(data, 'x') or data.x is None:
-            data.x = torch.zeros((data.num_nodes,1))
+            data.x = torch.zeros((data.num_nodes,0))
 
         match cfg.pseType:
             case "RWPE":
@@ -25,6 +25,8 @@ def runExperiement(cfg : configs.Configs):
                 return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
             case "None", _:
                 return data
+        
+        return data
 
     # Load dataset
     print("Loading dataset...")
@@ -41,7 +43,7 @@ def runExperiement(cfg : configs.Configs):
     #      attn_kwargs=None
     # )
 
-    metrics = np.empty(5)
+    metrics = np.empty(cfg.trials)
     for i in range(cfg.trials):
         print("Trial %d:" % i)
         match cfg.modelType:
