@@ -67,7 +67,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
                     test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum() if masked else (pred == data.y).sum()
 
                     total_correct += test_correct.item()
-                    total_test_nodes += (data.test_mask if masked else data.y).sum().item()
+                    total_test_nodes += (data.test_mask.sum().item() if masked else data.y.size(0))
                 else:
                     all_preds.append(out.detach().cpu().numpy())
                     all_targets.append(data.y.cpu().numpy())
@@ -106,7 +106,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
                 test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum() if masked else (pred == data.y).sum()
 
                 total_correct += test_correct.item()
-                total_test_nodes += (data.test_mask if masked else data.y).sum().item()
+                total_test_nodes += (data.test_mask.sum().item() if masked else data.y.size(0))
             else:
                 all_preds.append(out.detach().cpu().numpy())
                 all_targets.append(data.y.cpu().numpy())
