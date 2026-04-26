@@ -6,7 +6,7 @@ class Configs():
         self.heads = 2
         self.layers = 2
         self.dropout = 0.2
-        self.epochs = 100
+        self.epochs = 500
         
         # can be of type "RWPE", "LapPE", "RWPELifted"
         self.pseType = "RWPE"

@@ -3,6 +3,31 @@ import configs
 
 final = []
 
+def saveGraph(name, plotReturn, saveTo="results/graphs/"):
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.title("Loss")
+    for i in range(plotReturn.shape[1]):
+        plt.plot(plotReturn[0, i, :], label=f'Trial {i+1}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.title("Validation Metric")
+    for i in range(plotReturn.shape[1]):
+        plt.plot(plotReturn[1, i, :], label=f'Trial {i+1}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Metric')
+    plt.legend()
+
+    plt.suptitle(name)
+    plt.tight_layout()
+    plt.savefig(f"{saveTo}.png")
+    plt.close()
+
 def run(model, pse):
     id = "%s with %s" % (model, pse)
     print("Running", id)
@@ -16,7 +41,9 @@ def run(model, pse):
     cfg.pseType = pse
     cfg.trials = 5
 
-    result = experiment.runExperiement(cfg)
+    result, plotReturn = experiment.runExperiement(cfg)
+    saveGraph(id, plotReturn, saveTo="results/graphs/%s_%s" % (model, pse))
+    
     final.append((id, result))
 
 def printStats(final):

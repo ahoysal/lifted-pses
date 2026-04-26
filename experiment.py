@@ -34,14 +34,7 @@ def runExperiement(cfg : configs.Configs):
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
-    # pass dataset to model and train
-    # model = models.GPS(
-    #      channels=128,
-    #      pe_dim=cfg.rwpe_anchors,
-    #      num_layers=cfg.layers,
-    #      attn_type="performer",
-    #      attn_kwargs=None
-    # )
+    plotReturn = np.empty((2, cfg.trials, cfg.epochs)) # two channels for loss and val.
 
     metrics = np.empty(cfg.trials)
     for i in range(cfg.trials):
@@ -66,14 +59,16 @@ def runExperiement(cfg : configs.Configs):
                 )
             case _:
                 print("No model type specified! Exiting.")
-                return
+                return -1, plotReturn
 
         print("Training... (%d parameters)" % (sum(p.numel() for p in model.parameters() if p.requires_grad)))
-        metrics[i] = training.train(model, dataset, cfg.epochs)
+        metrics[i], lossGraph, valGraph = training.train(model, dataset, cfg.epochs)
+        plotReturn[0, i, :] = lossGraph
+        plotReturn[1, i, :] = valGraph
     
     print("Summary: mean %f, stddev %f." % (metrics.mean(), metrics.std()))
     print("\t", metrics)
-    return metrics
+    return metrics, plotReturn
 
 if __name__ == '__main__':
     cfg = configs.Configs()
