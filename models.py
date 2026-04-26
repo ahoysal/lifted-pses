@@ -13,6 +13,7 @@ from torch.nn import (
 from torch_geometric.nn import GINEConv, GPSConv, global_add_pool, global_mean_pool, global_max_pool
 from torch_geometric.nn.attention import PerformerAttention
 from torch_geometric.nn.models import GCN as BaseGCN
+from torch_geometric.utils import to_dense_batch
 
 class GCN(BaseGCN):
     def __init__(self, *args, **kwargs):
@@ -80,13 +81,18 @@ class GraphNodeTransformer(nn.Module):
         """
         # Add fake batch dimension: [N, F] -> [1, N, F]
         # x = x.unsqueeze(0)
+        batching = hasattr(data, "batch") and data.batch is not None
         
         # Project and Transform
         x = self.input_proj(data.x)
-        x = self.transformer(x)
+
+        x, mask = to_dense_batch(x, data.batch)
+
+        x = self.transformer(x, src_key_padding_mask=~mask)
+        x = x[mask]
         x = self.output_proj(x)
 
-        if hasattr(data, "batch") and data.batch is not None:
+        if batching:
             x = global_add_pool(x, data.batch)
         
         # Remove fake batch dimension: [1, N, d_model] -> [N, d_model]
