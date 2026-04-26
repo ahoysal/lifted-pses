@@ -13,7 +13,7 @@ def runExperiement(cfg : configs.Configs):
     # lift and do positional structural encodings
     def transform(data):
         if not hasattr(data, 'x') or data.x is None:
-            data.x = torch.zeros((data.num_nodes,1))
+            data.x = torch.rand((data.num_nodes,1))
 
         match cfg.pseType:
             case "RWPE":
