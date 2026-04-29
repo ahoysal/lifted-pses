@@ -36,11 +36,11 @@ class GCN(BaseGCN):
         Returns:
             Tensor of shape [N, out_dim]
         """
-        batching = hasattr(data, "batch") and data.batch is not None
+        graphLevel = (not hasattr(data, "train_mask")) or (data.train_mask is None)
 
-        x = super().forward(data.x, data.edge_index, batch=data.batch if batching else None)
+        x = super().forward(data.x, data.edge_index, batch=data.batch if graphLevel else None)
 
-        if batching:
+        if graphLevel:
             x = global_add_pool(x, data.batch)
         
         return x
@@ -81,18 +81,22 @@ class GraphNodeTransformer(nn.Module):
         """
         # Add fake batch dimension: [N, F] -> [1, N, F]
         # x = x.unsqueeze(0)
-        batching = hasattr(data, "batch") and data.batch is not None
+        graphLevel = (not hasattr(data, "train_mask")) or (data.train_mask is None)
         
         # Project and Transform
         x = self.input_proj(data.x)
 
-        x, mask = to_dense_batch(x, data.batch)
-
-        x = self.transformer(x, src_key_padding_mask=~mask)
-        x = x[mask]
+        if graphLevel:
+            # must pad to size of largest graph
+            x, mask = to_dense_batch(x, data.batch)
+            x = self.transformer(x, src_key_padding_mask=~mask)
+            x = x[mask]
+        else: 
+            x = self.transformer(x)
+        
         x = self.output_proj(x)
 
-        if batching:
+        if graphLevel:
             x = global_add_pool(x, data.batch)
         
         # Remove fake batch dimension: [1, N, d_model] -> [N, d_model]
