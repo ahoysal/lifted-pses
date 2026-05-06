@@ -6,7 +6,7 @@ class Configs():
         self.heads = 2
         self.layers = 2
         self.dropout = 0.2
-        self.epochs = 500
+        self.epochs = 300
         
         # can be of type "RWPE", "LapPE", "RWPELifted"
         self.pseType = "RWPE"
@@ -17,6 +17,9 @@ class Configs():
 
         self.rwpe_anchors = 20
         self.rwpe_len = 3
+
+        self.classification = True
+        self.multilabel = False
 
 def parseMessages():
     parser = argparse.ArgumentParser(description="")

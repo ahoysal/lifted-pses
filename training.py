@@ -6,9 +6,13 @@ from torch_geometric.nn import global_mean_pool
 import numpy as np
 import copy
 
-def evaluate(loader, model, multilabel, masked, device):
+def evaluate(loader, model, multilabel, classification, masked, device):
     model.eval()
     
+    # for regression
+    accumulated_mae = 0
+    number_graphs = 0
+
     # for single label
     total_correct = 0
     total_test_nodes = 0
@@ -22,7 +26,10 @@ def evaluate(loader, model, multilabel, masked, device):
             data = data.to(device)
 
             out = model(data)
-            if not multilabel:
+            if not classification:
+                accumulated_mae += (out - data.y.view(-1, 1)).abs().sum().item()
+                number_graphs += data.num_graphs
+            elif not multilabel:
                 pred = out.argmax(dim=1)
                 test_correct = (pred[data.test_mask] == data.y[data.test_mask]).sum() if masked else (pred == data.y).sum()
 
@@ -32,7 +39,9 @@ def evaluate(loader, model, multilabel, masked, device):
                 all_preds.append(out.detach().cpu().numpy())
                 all_targets.append(data.y.cpu().numpy())
 
-    if not multilabel:
+    if not classification:
+        return accumulated_mae / number_graphs
+    elif not multilabel:
         return total_correct / total_test_nodes
     else:
         # Concatenate lists of arrays into single large arrays
@@ -50,6 +59,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
 
     masked = not isinstance(dataset, dict)
     multilabel = False # TODO: infer/pass this in
+    classification = False # TODO: infer/pass this in
 
     # create a loader for batching
     trainDataset = dataset if masked else dataset["train"]
@@ -59,8 +69,14 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    lossFunction = torch.nn.BCEWithLogitsLoss() if multilabel else torch.nn.CrossEntropyLoss()
-    # lossFunction = torch.nn.BCEWithLogitsLoss()
+    lossFunction = None
+    if classification:
+        if multilabel:
+            lossFunction = torch.nn.BCEWithLogitsLoss()
+        else:
+            lossFunction = torch.nn.CrossEntropyLoss()
+    else:
+        lossFunction = torch.nn.L1Loss()
 
     lossGraph = []
     valMetricGraph = []
@@ -79,7 +95,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
                 loss = lossFunction(out[data.train_mask], data.y[data.train_mask])
             else:
                 # probably graph classification
-                loss = lossFunction(out, data.y)
+                loss = lossFunction(out, data.y.view(-1, 1) if not classification else data.y)
             
             loss.backward()
             optimizer.step()
@@ -87,7 +103,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
             total_loss += loss.item()
         
         # --- Test/Evaluation Step ---
-        metric = evaluate(valLoader, model, multilabel, masked, device)
+        metric = evaluate(valLoader, model, multilabel, classification, masked, device)
 
         print(f"Epoch {epoch+1:03d} | Loss: {total_loss:.4f} | Val {('Acc' if not multilabel else 'AP')}: {metric:.4f}")
 
@@ -101,7 +117,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
     if best[1] is not None:
         model.load_state_dict(best[1])
     
-    metric = evaluate(testLoader, model, multilabel, masked, device)
+    metric = evaluate(testLoader, model, multilabel, classification, masked, device)
 
     print(f"Final Test {('Acc' if not multilabel else 'AP')}: {metric:.4f}")
     

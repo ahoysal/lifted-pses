@@ -14,6 +14,8 @@ def runExperiement(cfg : configs.Configs):
     def transform(data):
         if not hasattr(data, 'x') or data.x is None:
             data.x = torch.rand((data.num_nodes,1))
+        
+        data.x = data.x.float()
 
         match cfg.pseType:
             case "RWPE":
@@ -30,11 +32,12 @@ def runExperiement(cfg : configs.Configs):
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_csl(transform=transform)
+    dataset = datasets.load_zinc(transform=transform, cfg=cfg)
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
     plotReturn = np.empty((2, cfg.trials, cfg.epochs)) # two channels for loss and val.
+    out_dim = trainDataset.num_classes if cfg.classification else 1
 
     metrics = np.empty(cfg.trials)
     for i in range(cfg.trials):
@@ -46,7 +49,7 @@ def runExperiement(cfg : configs.Configs):
                     d_model=cfg.embedded,
                     nhead=cfg.heads,
                     num_layers=cfg.layers,
-                    out_dim=trainDataset.num_classes,
+                    out_dim=out_dim,
                     dropout=cfg.dropout
                 )
             case "GCN":
@@ -54,7 +57,7 @@ def runExperiement(cfg : configs.Configs):
                     in_channels=trainDataset.num_features,
                     hidden_channels=cfg.embedded,
                     num_layers=cfg.layers,
-                    out_channels=trainDataset.num_classes,
+                    out_channels=out_dim,
                     dropout=cfg.dropout
                 )
             case _:
