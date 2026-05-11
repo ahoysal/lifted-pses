@@ -110,7 +110,7 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
         lossGraph.append(total_loss)
         valMetricGraph.append(metric)
 
-        if metric > best[0]:
+        if best[1] is None or (metric > best[0] and classification) or (metric < best[0] and not classification):
             best = (metric, copy.deepcopy(model.state_dict()))
             print("[TEST]: better %f!" % metric)
 

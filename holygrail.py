@@ -35,7 +35,7 @@ def run(model, pse):
     cfg = configs.Configs()
     cfg.modelType = model
     if cfg.modelType == "GCN":
-        cfg.layers = 3
+        cfg.layers = 4
         cfg.embedded = 754
         cfg.rwpe_anchors = 20
     cfg.pseType = pse
@@ -58,11 +58,10 @@ cfg = configs.Configs()
 run("Transformer", "RWPE")
 run("Transformer", "LapPE")
 run("Transformer", "RWPELifted")
+run("GCN", "None")
 run("GCN", "RWPE")
 run("GCN", "LapPE")
 run("GCN", "RWPELifted")
-
-run("GCN", "None")
 run("Transformer", "None")
 
 printStats(final)

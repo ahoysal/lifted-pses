@@ -28,11 +28,18 @@ def load_csl(transform, cfg=None):
 
 
 def load_zinc(transform, cfg=None):
+
+    import torch.nn.functional as F
+
+    def zinc_transform(data):
+        data.x = F.one_hot(data.x.squeeze(), num_classes=28).float()
+        return transform(data) if transform is not None else data
+
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = False
     return {
-        "train": geom_datasets.ZINC(root="data/ZINC", split="train", subset=True, pre_transform=transform, force_reload=True),
-        "test": geom_datasets.ZINC(root="data/ZINC", split="test", subset=True, pre_transform=transform, force_reload=False),
-        "val": geom_datasets.ZINC(root="data/ZINC", split="val", subset=True, pre_transform=transform, force_reload=False),
+        "train": geom_datasets.ZINC(root="data/ZINC", split="train", subset=True, pre_transform=zinc_transform, force_reload=True),
+        "test": geom_datasets.ZINC(root="data/ZINC", split="test", subset=True, pre_transform=zinc_transform, force_reload=False),
+        "val": geom_datasets.ZINC(root="data/ZINC", split="val", subset=True, pre_transform=zinc_transform, force_reload=False),
     }
