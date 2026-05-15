@@ -62,5 +62,5 @@ if python3 -c 'import torch; exit(0 if torch.cuda.is_available() else 1)' 2>/dev
 fi
 echo ""
 
-python3 sweep.py
+python3 scripts/sweep.py
 

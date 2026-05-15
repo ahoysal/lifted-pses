@@ -55,6 +55,7 @@ def printStats(final):
 
 cfg = configs.Configs()
 
+run("Transformer", "None")
 run("Transformer", "RWPE")
 run("Transformer", "LapPE")
 run("Transformer", "RWPELifted")
@@ -62,6 +63,5 @@ run("GCN", "None")
 run("GCN", "RWPE")
 run("GCN", "LapPE")
 run("GCN", "RWPELifted")
-run("Transformer", "None")
 
 printStats(final)

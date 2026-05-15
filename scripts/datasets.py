@@ -1,4 +1,5 @@
 import torch_geometric.datasets as geom_datasets
+import bruteforce
 
 def load_cora(transform, cfg=None):
     if cfg is not None:
@@ -26,7 +27,6 @@ def load_csl(transform, cfg=None):
         "val": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="val", pre_transform=transform, force_reload=False),
     }
 
-
 def load_zinc(transform, cfg=None):
 
     import torch.nn.functional as F
@@ -42,4 +42,14 @@ def load_zinc(transform, cfg=None):
         "train": geom_datasets.ZINC(root="data/ZINC", split="train", subset=True, pre_transform=zinc_transform, force_reload=True),
         "test": geom_datasets.ZINC(root="data/ZINC", split="test", subset=True, pre_transform=zinc_transform, force_reload=False),
         "val": geom_datasets.ZINC(root="data/ZINC", split="val", subset=True, pre_transform=zinc_transform, force_reload=False),
+    }
+
+def load_bruteforce(transform, cfg=None):
+    if cfg is not None:
+        cfg.multilabel = False
+        cfg.classification = False # Regression on number of triangles
+    return {
+        "train": bruteforce.BruteforceDataset(root="data/Bruteforce", split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.BruteforceDataset(root="data/Bruteforce", split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.BruteforceDataset(root="data/Bruteforce", split="val", pre_transform=transform, force_reload=False),
     }

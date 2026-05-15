@@ -32,7 +32,7 @@ def runExperiement(cfg : configs.Configs):
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_zinc(transform=transform, cfg=cfg)
+    dataset = datasets.load_bruteforce(transform=transform, cfg=cfg)
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
