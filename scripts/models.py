@@ -104,6 +104,43 @@ class GraphNodeTransformer(nn.Module):
         
         return x
     
+
+class MeanGuesser(nn.Module):
+    def __init__(self, prediction):
+        """
+        Args:
+            prediction: The prediction to return for all
+        """
+        super().__init__()
+        if not isinstance(prediction, torch.Tensor):
+            prediction = torch.tensor([prediction], dtype=torch.float32)
+
+        self.pred = nn.Parameter(prediction)
+
+    def forward(self, data):
+        """
+        Args:
+            data: 
+                data.x: Tensor of shape [N, F] representing N nodes with F features.
+        Returns:
+            Tensor of shape [N, 1]
+        """
+        graphLevel = (not hasattr(data, "train_mask")) or (data.train_mask is None)
+
+        toReturn = 1
+        if graphLevel:
+            canidate = getattr(data, 'num_graphs', 1)
+            if canidate is not None:
+                toReturn = canidate
+        else:
+            canidate = getattr(data, 'num_nodes', 1)
+            if canidate is not None:
+                toReturn = canidate
+            else:
+                toReturn = data.x.shape[0]
+        
+        return self.pred.view(1, -1).expand(toReturn, -1)
+
 # currently in a funky state, do not use...
 class GPS(torch.nn.Module):
     def __init__(self, channels: int, pe_dim: int, num_layers: int,

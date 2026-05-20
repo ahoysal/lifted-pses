@@ -11,7 +11,7 @@ class Configs():
         # can be of type "RWPE", "LapPE", "RWPELifted"
         self.pseType = "RWPE"
 
-        # can be of type "Transformer", "GCN"
+        # can be of type "Transformer", "GCN", "MeanGuesser"
         self.modelType = "Transformer"
         self.trials = 5
 
@@ -20,6 +20,8 @@ class Configs():
 
         self.classification = True
         self.multilabel = False
+
+        self.staticModel = False
 
 def parseMessages():
     parser = argparse.ArgumentParser(description="")

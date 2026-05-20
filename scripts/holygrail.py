@@ -3,7 +3,7 @@ import configs
 
 final = []
 
-def saveGraph(name, plotReturn, saveTo="results/graphs/"):
+def saveGraph(name, plotReturn, saveTo="results/graphs/default"):
     import matplotlib.pyplot as plt
 
     plt.figure(figsize=(12, 6))
@@ -34,15 +34,18 @@ def run(model, pse):
 
     cfg = configs.Configs()
     cfg.modelType = model
+    cfg.pseType = pse
+    cfg.trials = 5
+
     if cfg.modelType == "GCN":
         cfg.layers = 4
         cfg.embedded = 754
         cfg.rwpe_anchors = 20
-    cfg.pseType = pse
-    cfg.trials = 5
+    if cfg.modelType == "MeanGuesser":
+        cfg.trials = 1 # we only need one trial
 
     result, plotReturn = experiment.runExperiement(cfg)
-    saveGraph(id, plotReturn, saveTo="results/graphs/%s_%s" % (model, pse))
+    saveGraph(id, plotReturn, saveTo="results/graphs/sds/%s_%s" % (model, pse))
     
     final.append((id, result))
 
@@ -55,6 +58,7 @@ def printStats(final):
 
 cfg = configs.Configs()
 
+run("MeanGuesser", "None")
 run("Transformer", "None")
 run("Transformer", "RWPE")
 run("Transformer", "LapPE")

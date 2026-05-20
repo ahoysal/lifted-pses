@@ -53,3 +53,23 @@ def load_bruteforce(transform, cfg=None):
         "test": bruteforce.BruteforceDataset(root="data/Bruteforce", split="test", pre_transform=transform, force_reload=False),
         "val": bruteforce.BruteforceDataset(root="data/Bruteforce", split="val", pre_transform=transform, force_reload=False),
     }
+
+def load_erdosrenyi(transform, cfg=None):
+    if cfg is not None:
+        cfg.multilabel = False
+        cfg.classification = False # Regression on number of 4 cycles
+    return {
+        "train": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="val", pre_transform=transform, force_reload=False),
+    }
+
+def load_sds(transform, cfg=None):
+    if cfg is not None:
+        cfg.multilabel = False
+        cfg.classification = False # Regression on number of 4 cycles
+    return {
+        "train": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="val", pre_transform=transform, force_reload=False),
+    }

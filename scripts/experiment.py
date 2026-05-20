@@ -32,7 +32,7 @@ def runExperiement(cfg : configs.Configs):
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_bruteforce(transform=transform, cfg=cfg)
+    dataset = datasets.load_sds(transform=transform, cfg=cfg)
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
@@ -52,6 +52,7 @@ def runExperiement(cfg : configs.Configs):
                     out_dim=out_dim,
                     dropout=cfg.dropout
                 )
+                cfg.staticModel = False
             case "GCN":
                 model = models.GCN(
                     in_channels=trainDataset.num_features,
@@ -60,12 +61,18 @@ def runExperiement(cfg : configs.Configs):
                     out_channels=out_dim,
                     dropout=cfg.dropout
                 )
+                cfg.staticModel = False
+            case "MeanGuesser":
+                model = models.MeanGuesser(
+                    prediction=trainDataset.data.y.mean(dim=0)
+                )
+                cfg.staticModel = True
             case _:
                 print("No model type specified! Exiting.")
                 return -1, plotReturn
 
         print("Training... (%d parameters)" % (sum(p.numel() for p in model.parameters() if p.requires_grad)))
-        metrics[i], lossGraph, valGraph = training.train(model, dataset, cfg.epochs)
+        metrics[i], lossGraph, valGraph = training.train(model, dataset, cfg)
         plotReturn[0, i, :] = lossGraph
         plotReturn[1, i, :] = valGraph
     

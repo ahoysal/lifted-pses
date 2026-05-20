@@ -6,6 +6,9 @@ from torch_geometric.nn import global_mean_pool
 import numpy as np
 import copy
 
+import configs
+import validation
+
 def evaluate(loader, model, multilabel, classification, masked, device):
     model.eval()
     
@@ -51,7 +54,8 @@ def evaluate(loader, model, multilabel, classification, masked, device):
         # Calculate AP on the entire validation set at once
         return average_precision_score(full_targets, full_preds)
 
-def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], epochs: int):
+def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], cfg : configs.Configs):
+    epochs = cfg.epochs
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -87,7 +91,9 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
         
         for data in trainLoader:
             data = data.to(device)
-            optimizer.zero_grad()
+            
+            if not cfg.staticModel:
+                optimizer.zero_grad()
 
             out = model(data)
 
@@ -98,7 +104,8 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
                 loss = lossFunction(out, data.y.view(-1, 1) if not classification else data.y)
             
             loss.backward()
-            optimizer.step()
+            if not cfg.staticModel:
+                optimizer.step()
 
             total_loss += loss.item()
         
@@ -120,5 +127,6 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], e
     metric = evaluate(testLoader, model, multilabel, classification, masked, device)
 
     print(f"Final Test {('Acc' if not multilabel else 'AP')}: {metric:.4f}")
+    validation.validateOnRS(model, device)
     
     return metric, lossGraph, valMetricGraph
