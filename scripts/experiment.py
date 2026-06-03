@@ -8,12 +8,13 @@ import pses
 import models
 import training
 import configs
+import validation
 
 def runExperiement(cfg : configs.Configs):
     # lift and do positional structural encodings
     def transform(data):
         if not hasattr(data, 'x') or data.x is None:
-            data.x = torch.rand((data.num_nodes,1))
+            data.x = torch.ones((data.num_nodes,1))
         
         data.x = data.x.float()
 
@@ -25,6 +26,8 @@ def runExperiement(cfg : configs.Configs):
             case "RWPELifted":
                 lifted = liftings.makeHG(data)
                 return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
+            case "Hodge":
+                return pses.addHodgePE(data, cfg.rwpe_anchors)
             case "None", _:
                 return data
         
@@ -32,7 +35,7 @@ def runExperiement(cfg : configs.Configs):
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_sds(transform=transform, cfg=cfg)
+    dataset = datasets.load_zinc(transform=transform, cfg=cfg)
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
@@ -75,6 +78,9 @@ def runExperiement(cfg : configs.Configs):
         metrics[i], lossGraph, valGraph = training.train(model, dataset, cfg)
         plotReturn[0, i, :] = lossGraph
         plotReturn[1, i, :] = valGraph
+
+        model.cpu()
+        # validation.validateOnRS(model, "cpu", transform)
     
     print("Summary: mean %f, stddev %f." % (metrics.mean(), metrics.std()))
     print("\t", metrics)
@@ -87,4 +93,6 @@ if __name__ == '__main__':
     # cfg.embedded = 754
     # cfg.rwpe_anchors = 20
     print("params: embedded: %d, heads: %d, layers: %d, dropout: %f, epochs: %d, rwpe_anchors: %d, rwpe_len: %d" % (cfg.embedded, cfg.heads, cfg.layers, cfg.dropout, cfg.epochs, cfg.rwpe_anchors, cfg.rwpe_len))
+    
+    cfg.pseType = "Hodge"
     runExperiement(cfg)

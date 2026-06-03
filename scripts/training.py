@@ -7,7 +7,6 @@ import numpy as np
 import copy
 
 import configs
-import validation
 
 def evaluate(loader, model, multilabel, classification, masked, device):
     model.eval()
@@ -127,6 +126,5 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], c
     metric = evaluate(testLoader, model, multilabel, classification, masked, device)
 
     print(f"Final Test {('Acc' if not multilabel else 'AP')}: {metric:.4f}")
-    validation.validateOnRS(model, device)
     
     return metric, lossGraph, valMetricGraph

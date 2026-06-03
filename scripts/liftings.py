@@ -1,5 +1,6 @@
 import torch_geometric.data as tg
 from torch_geometric.utils.convert import to_networkx
+import torch
 import networkx as nx
 import xgi
 import numpy as np
@@ -26,6 +27,79 @@ def makeHG(graph : tg.data.BaseData):
 
     return hg
 
+def unique_undirected_edges(edge_index: torch.Tensor, n: int) -> list[tuple[int, int]]:
+    edges = set()
+    for u, v in edge_index.cpu().t().tolist():
+        if u == v:
+            continue
+        a, b = (u, v) if u < v else (v, u)
+        if 0 <= a < n and 0 <= b < n:
+            edges.add((a, b))
+    return sorted(edges)
+
+def undirected_adjacency_sets(edge_index: torch.Tensor, n: int) -> list[set]:
+    adj = [set() for _ in range(n)]
+    for u, v in unique_undirected_edges(edge_index, n):
+        adj[u].add(v)
+        adj[v].add(u)
+    return adj
+
+def find_triangles(adj: list[set]) -> list[tuple[int, int, int]]:
+    """All 3-cliques i<j<k."""
+    triangles = []
+    n = len(adj)
+    for i in range(n):
+        for j in adj[i]:
+            if j <= i:
+                continue
+            common = adj[i].intersection(adj[j])
+            for k in common:
+                if k > j:
+                    triangles.append((i, j, k))
+    return triangles
+
+def build_hodge_matrices(data: tg.Data, max_edges: int) -> dict[str, object]:
+    """Build B1, B2, L1 and metadata for clique complex up to dimension 2."""
+    n = int(data.num_nodes)
+    edges = unique_undirected_edges(data.edge_index, n)
+    m = len(edges)
+    if n == 0 or m == 0 or m > max_edges:
+        return {}
+
+    edge_to_idx = {e: i for i, e in enumerate(edges)}
+    adj = undirected_adjacency_sets(data.edge_index, n)
+    triangles = find_triangles(adj)
+
+    B1 = np.zeros((n, m), dtype=np.float64)
+    for idx, (u, v) in enumerate(edges):
+        # fixed orientation u -> v because u < v
+        B1[u, idx] = -1.0
+        B1[v, idx] = 1.0
+
+    t = len(triangles)
+    B2 = np.zeros((m, t), dtype=np.float64)
+    for col, (i, j, k) in enumerate(triangles):
+        # oriented triangle [i,j,k], boundary [j,k] - [i,k] + [i,j]
+        # our edge orientation is always low -> high, so these signs are valid for i<j<k
+        B2[edge_to_idx[(j, k)], col] = 1.0
+        B2[edge_to_idx[(i, k)], col] = -1.0
+        B2[edge_to_idx[(i, j)], col] = 1.0
+
+    lower = B1.T @ B1
+    upper = B2 @ B2.T if t > 0 else np.zeros((m, m), dtype=np.float64)
+    L1 = lower + upper
+    return {
+        "n": n,
+        "m": m,
+        "edges": edges,
+        "edge_to_idx": edge_to_idx,
+        "triangles": triangles,
+        "B1": B1,
+        "B2": B2,
+        "L1": L1,
+        "lower": lower,
+        "upper": upper,
+    }
 
 def compute_forman_ricci_curvature(G: nx.Graph):
     """

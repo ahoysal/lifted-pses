@@ -16,6 +16,38 @@ def countTriangles(edge_index, num_nodes):
 
     return int(round(triangle_count))
 
+def countFourCliques(edge_index, num_nodes):
+    # 1. Create the adjacency matrix
+    adj = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
+    adj[edge_index[0], edge_index[1]] = 1.0
+    
+    # Ensure no self-loops, which could artificially inflate the triangle counts
+    adj.fill_diagonal_(0) 
+
+    # 2. Build a batched 3D tensor B where B[i] is the adjacency matrix 
+    # of the subgraph induced by the neighborhood of node i.
+    # 
+    # Using PyTorch broadcasting:
+    # - adj.unsqueeze(0) provides the base adjacency matrix (shape 1xNxN).
+    # - adj.unsqueeze(1) and adj.unsqueeze(2) create an outer product mask for 
+    #   each node's connections. B[i, j, k] will be 1 if and only if j and k 
+    #   are connected AND both are connected to i.
+    B = adj.unsqueeze(0) * adj.unsqueeze(1) * adj.unsqueeze(2)
+
+    # 3. Batched matrix multiplication to compute B^3 for all neighborhoods at once
+    B_cubed = torch.matmul(B, torch.matmul(B, B))
+    
+    # 4. Count the triangles in each neighborhood using trace(A^3) / 6
+    # B_cubed.diagonal extracts the diagonal for each batched matrix.
+    traces = B_cubed.diagonal(dim1=1, dim2=2).sum(dim=1)
+    triangles_per_node = traces / 6.0
+    
+    # 5. A 4-clique contains 4 nodes, meaning it will be counted as 1 triangle 
+    # in exactly 4 different neighborhoods. Thus, we divide the total sum by 4.
+    four_clique_count = triangles_per_node.sum() / 4.0
+
+    return int(round(four_clique_count.item()))
+
 def countFourCycles(edge_index, num_nodes):
     # 1. Create the adjacency matrix
     adj = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
@@ -146,7 +178,7 @@ class SameDegreeSequenceDataset(InMemoryDataset):
             data_list = []
             
             print("Generating synthetic graphs...")
-            num_graphs = 1000 if split == "train" else 200
+            num_graphs = 10000 if split == "train" else 2000
             graphsLeft = num_graphs
 
             while graphsLeft > 0:
@@ -159,7 +191,7 @@ class SameDegreeSequenceDataset(InMemoryDataset):
                 nxg = to_networkx(data, to_undirected=True)
 
                 for j in range(min(SEQUENCE_LENGTH, graphsLeft)):
-                    y = torch.tensor([countFourCycles(edge_index, num_nodes)], dtype=torch.float)
+                    y = torch.tensor([countFourCliques(edge_index, num_nodes)], dtype=torch.float)
                     data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                     data_list.append(data)
                     graphsLeft -= 1

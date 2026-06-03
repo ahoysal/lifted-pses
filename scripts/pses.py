@@ -10,6 +10,7 @@ import xgi
 import scipy
 from scipy.sparse import coo_array
 from torch_geometric.utils import degree
+import liftings
 
 def coo2Sparse(coo) -> torch.Tensor:
     """Convert scipy sparse COO matrix to PyTorch sparse tensor."""
@@ -22,6 +23,44 @@ def coo2Sparse(coo) -> torch.Tensor:
     i = torch.LongTensor(indices)
     v = torch.FloatTensor(values)
     return torch.sparse_coo_tensor(i, v, torch.Size(shape))
+
+def project_edge_features_to_nodes(n: int, edges: list[tuple[int, int]], edge_feat: np.ndarray) -> torch.Tensor:
+    """Add edge features over incident edges."""
+    if edge_feat.ndim == 1:
+        edge_feat = edge_feat.reshape(-1, 1)
+    d = edge_feat.shape[1]
+    node_feat = np.zeros((n, d), dtype=np.float64)
+    counts = np.zeros((n, 1), dtype=np.float64)
+    for eidx, (u, v) in enumerate(edges):
+        node_feat[u] += edge_feat[eidx]
+        node_feat[v] += edge_feat[eidx]
+        counts[u, 0] += 1.0
+        counts[v, 0] += 1.0
+    # node_feat = node_feat / np.maximum(counts, 1.0)
+    return torch.tensor(node_feat, dtype=torch.float32)
+
+def hodge_eigen_pe(data: Data, dim: int, max_edges: int) -> torch.Tensor:
+    """Smallest non-harmonic edge-Hodge eigenvectors projected to nodes."""
+    n = int(data.num_nodes)
+    built = liftings.build_hodge_matrices(data, max_edges)
+    if built is None:
+        return torch.zeros((n, dim), dtype=torch.float32)
+    L1 = built["L1"]
+    edges = built["edges"]
+    try:
+        evals, evecs = np.linalg.eigh(L1)
+        idx = np.argsort(evals)
+        evals, evecs = evals[idx], evecs[:, idx]
+        # skip numerical kernel; use first positive low-frequency modes
+        pos = np.where(evals > 1e-7)[0]
+        chosen = pos[:dim]
+        edge_feat = np.zeros((built["m"], dim), dtype=np.float64)
+        for j, c in enumerate(chosen):
+            # absolute value removes arbitrary eigenvector sign; squared mass is also stable
+            edge_feat[:, j] = np.abs(evecs[:, c])
+        return project_edge_features_to_nodes(n, edges, edge_feat)
+    except Exception:
+        return torch.zeros((n, dim), dtype=torch.float32)
 
 # One of our additions - implementation needs some tweaking to be optimized for its proposed purpose
 def compute_hyperedges_medoids(hypergraph: xgi.Hypergraph, node_features: torch.Tensor, top_k: int = 1):
@@ -217,23 +256,9 @@ import torch_geometric.transforms as T
 import torch.nn.functional as F
 from scipy.sparse.linalg import eigs
 
-def addHodgeLaplacianPE(data, hg : xgi.Hypergraph, PElen):
-    totalNodes = data.x.shape[-2]
-    trueLen = min(PElen, totalNodes - 1)
-
-    lap = xgi.linalg.laplacian(hg)
-    
-
-    lapPE = torch.transpose(lap[:trueLen])
-
-    trueLen = data.lapPE.shape[-1]
-
-    if trueLen < PElen:
-        padding_size = PElen - trueLen
-        data.lapPE = F.pad(data.lapPE, (0, padding_size, 0, 0), "constant", 0)
-    
-    data.x = torch.cat([data.x, data.lapPE], dim=1)
-
+def addHodgePE(data, PElen):
+    pses = hodge_eigen_pe(data, PElen, 500)
+    data.x = torch.cat([data.x, pses], dim=1)
     return data
 
 def addLaplacianPE(data, PElen):

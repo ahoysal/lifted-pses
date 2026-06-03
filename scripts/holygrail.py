@@ -58,6 +58,8 @@ def printStats(final):
 
 cfg = configs.Configs()
 
+run("Transformer", "Hodge")
+run("GCN", "Hodge")
 run("MeanGuesser", "None")
 run("Transformer", "None")
 run("Transformer", "RWPE")

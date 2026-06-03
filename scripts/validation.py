@@ -3,6 +3,7 @@ import networkx
 import torch
 from torch_geometric.utils import from_networkx
 from torch_geometric.loader import DataLoader
+import bruteforce
 
 # From wikipedia:
 # The Shrikhande graph can be constructed as a Cayley graph. The vertex set is Z_4 x Z_4.
@@ -38,18 +39,19 @@ def rooks4x4():
     
     return tr
 
-def validateOnRS(model, device):
+def validateOnRS(model, device, transform=None):
     g_shrikhande = shrikhande()
     g_rooks = rooks4x4()
 
     data_shrikhande = from_networkx(g_shrikhande)
     data_rooks = from_networkx(g_rooks)
 
-    data_shrikhande.x = torch.rand((data_shrikhande.num_nodes,1))
-    data_rooks.x = torch.rand((data_rooks.num_nodes,1))
+    data_shrikhande.y = countFourCliques(data_shrikhande.edge_index, data_shrikhande.num_nodes).view(1)
+    data_rooks.y = countFourCliques(data_rooks.edge_index, data_rooks.num_nodes).view(1)
 
-    data_shrikhande.y = torch.tensor([0])
-    data_rooks.y = torch.tensor([0])
+    if transform is not None:
+        data_shrikhande = transform(data_shrikhande)
+        data_rooks = transform(data_rooks)
 
     graph_list = [data_shrikhande, data_rooks]
     loader = DataLoader(graph_list, batch_size=2, shuffle=False)
