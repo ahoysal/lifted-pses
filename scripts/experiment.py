@@ -11,6 +11,7 @@ import configs
 import validation
 
 def runExperiement(cfg : configs.Configs):
+    plotReturn = np.empty((2, cfg.trials, cfg.epochs)) # two channels for loss and val.
     # lift and do positional structural encodings
     def transform(data):
         if not hasattr(data, 'x') or data.x is None:
@@ -18,24 +19,31 @@ def runExperiement(cfg : configs.Configs):
         
         data.x = data.x.float()
 
-        match cfg.pseType:
-            case "RWPE":
-                return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, data)
-            case "LapPE":
-                return pses.addLaplacianPE(data, cfg.rwpe_anchors)
-            case "RWPELifted":
-                lifted = liftings.makeHG(data)
-                return pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
-            case "Hodge":
-                return pses.addHodgePE(data, cfg.rwpe_anchors)
-            case "None", _:
-                return data
+        for i in cfg.pseType:
+            match i:
+                case "RWPE":
+                    data = pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, data)
+                case "LapPE":
+                    data = pses.addLaplacianPE(data, cfg.rwpe_anchors)
+                case "RWPELifted":
+                    lifted = liftings.makeHGFormanRicci(data)
+                    data = pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
+                case "Hodge":
+                    data = pses.addHodgePE(data, cfg.rwpe_anchors)
+                case "None":
+                    pass
+                case _:
+                    print(f"Unknown PSE {i}.")
         
         return data
 
     # Load dataset
     print("Loading dataset...")
-    dataset = datasets.load_zinc(transform=transform, cfg=cfg)
+    if cfg.dataset not in datasets.DATASETS:
+        print(f"Failed to find dataset {cfg.DATASETS}! Returning.")
+        return -1, plotReturn
+    dataset = datasets.DATASETS[cfg.dataset](transform=transform, cfg=cfg)
+
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
 
@@ -94,5 +102,5 @@ if __name__ == '__main__':
     # cfg.rwpe_anchors = 20
     print("params: embedded: %d, heads: %d, layers: %d, dropout: %f, epochs: %d, rwpe_anchors: %d, rwpe_len: %d" % (cfg.embedded, cfg.heads, cfg.layers, cfg.dropout, cfg.epochs, cfg.rwpe_anchors, cfg.rwpe_len))
     
-    cfg.pseType = "Hodge"
+    cfg.pseType = ["Hodge"]
     runExperiement(cfg)

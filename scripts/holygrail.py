@@ -1,5 +1,6 @@
-import experiment
 import configs
+import argparse
+from datasets import DATASETS
 
 final = []
 
@@ -28,14 +29,19 @@ def saveGraph(name, plotReturn, saveTo="results/graphs/default"):
     plt.savefig(f"{saveTo}.png")
     plt.close()
 
-def run(model, pse):
-    id = "%s with %s" % (model, pse)
+def run(dataset, model, pse, datasetRoot=None):
+    import experiment
+    pseString = "+".join(pse)
+    id = "%s with %s" % (model, pseString)
     print("Running", id)
 
     cfg = configs.Configs()
+    cfg.dataset = dataset
     cfg.modelType = model
     cfg.pseType = pse
     cfg.trials = 5
+
+    cfg.datasetRoot = datasetRoot
 
     if cfg.modelType == "GCN":
         cfg.layers = 4
@@ -45,7 +51,7 @@ def run(model, pse):
         cfg.trials = 1 # we only need one trial
 
     result, plotReturn = experiment.runExperiement(cfg)
-    saveGraph(id, plotReturn, saveTo="results/graphs/sds/%s_%s" % (model, pse))
+    saveGraph(id, plotReturn, saveTo="results/graphs/sds/%s_%s" % (model, pseString))
     
     final.append((id, result))
 
@@ -56,18 +62,28 @@ def printStats(final):
         print("\tstd: %f" % i[1].std())
         print("\traw:", i[1])
 
-cfg = configs.Configs()
+parser = argparse.ArgumentParser(description="Run PSEs on a lifted graph.")
+parser.add_argument("-d", "--dataset", type=str, default="ZINC", help=f"Dataset. Can be any in { ', '.join(DATASETS.keys()) }")
+parser.add_argument("-m", "--model", type=str, default="MeanGuesser", help="Name of the person")
+parser.add_argument("-r", "--dsroot", type=str, default=None, help="Root to store data")
+parser.add_argument("--HodgePE", action="store_true", help="Include Hodge Laplacian in PSEs")
+parser.add_argument("--RWPE", action="store_true", help="Include RWPEs in PSEs")
+parser.add_argument("--LapPE", action="store_true", help="Include LapPE in PSEs")
+parser.add_argument("--RWPELifted", action="store_true", help="Include RWPELifted in PSEs")
 
-run("Transformer", "Hodge")
-run("GCN", "Hodge")
-run("MeanGuesser", "None")
-run("Transformer", "None")
-run("Transformer", "RWPE")
-run("Transformer", "LapPE")
-run("Transformer", "RWPELifted")
-run("GCN", "None")
-run("GCN", "RWPE")
-run("GCN", "LapPE")
-run("GCN", "RWPELifted")
+args = parser.parse_args()
+
+pse = []
+if args.HodgePE:
+    pse.append("Hodge")
+if args.RWPE:
+    pse.append("RWPE")
+if args.LapPE:
+    pse.append("LapPE")
+if args.RWPELifted:
+    pse.append("RWPELifted")
+
+print(f"Running dataset {args.dataset} with model {args.model} and pses {pse}, datasetRoot = {args.dsroot}.")
+run(args.dataset, args.model, pse, args.dsroot)
 
 printStats(final)

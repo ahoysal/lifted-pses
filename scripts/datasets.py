@@ -2,25 +2,29 @@ import torch_geometric.datasets as geom_datasets
 import bruteforce
 
 def load_cora(transform, cfg=None):
+    root = "data/"
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = True
     return geom_datasets.Planetoid(root="data/", name="cora", pre_transform=transform, force_reload=True)
 
 def load_lrgb(transform, cfg=None):
+    root = "data/"
     if cfg is not None:
         cfg.multilabel = True
         cfg.classification = True
+    
     return {
-        "train": geom_datasets.LRGBDataset(root="data/", name="Peptides-func", split="train", pre_transform=transform, force_reload=True),
-        "test": geom_datasets.LRGBDataset(root="data/", name="Peptides-func", split="test", pre_transform=transform, force_reload=False),
-        "val": geom_datasets.LRGBDataset(root="data/", name="Peptides-func", split="val", pre_transform=transform, force_reload=False),
+        "train": geom_datasets.LRGBDataset(root=root, name="Peptides-func", split="train", pre_transform=transform, force_reload=True),
+        "test": geom_datasets.LRGBDataset(root=root, name="Peptides-func", split="test", pre_transform=transform, force_reload=False),
+        "val": geom_datasets.LRGBDataset(root=root, name="Peptides-func", split="val", pre_transform=transform, force_reload=False),
     }
 
 def load_csl(transform, cfg=None):
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = True
+        
     return {
         "train": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="train", pre_transform=transform, force_reload=True),
         "test": geom_datasets.GNNBenchmarkDataset(root="data/", name="CSL", split="test", pre_transform=transform, force_reload=False),
@@ -35,19 +39,28 @@ def load_zinc(transform, cfg=None):
         data.x = F.one_hot(data.x.squeeze(), num_classes=28).float()
         return transform(data) if transform is not None else data
 
+    root = "data/ZINC"
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = False
+        if cfg.datasetRoot is not None:
+            root = "data/" + cfg.datasetRoot
+
     return {
-        "train": geom_datasets.ZINC(root="data/ZINC", split="train", subset=True, pre_transform=zinc_transform, force_reload=True),
-        "test": geom_datasets.ZINC(root="data/ZINC", split="test", subset=True, pre_transform=zinc_transform, force_reload=False),
-        "val": geom_datasets.ZINC(root="data/ZINC", split="val", subset=True, pre_transform=zinc_transform, force_reload=False),
+        "train": geom_datasets.ZINC(root=root, split="train", subset=True, pre_transform=zinc_transform, force_reload=True),
+        "test": geom_datasets.ZINC(root=root, split="test", subset=True, pre_transform=zinc_transform, force_reload=False),
+        "val": geom_datasets.ZINC(root=root, split="val", subset=True, pre_transform=zinc_transform, force_reload=False),
     }
 
 def load_bruteforce(transform, cfg=None):
+
+    root = "data/Bruteforce"
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = False # Regression on number of triangles
+        if cfg.datasetRoot is not None:
+            root = cfg.datasetRoot
+    
     return {
         "train": bruteforce.BruteforceDataset(root="data/Bruteforce", split="train", pre_transform=transform, force_reload=True),
         "test": bruteforce.BruteforceDataset(root="data/Bruteforce", split="test", pre_transform=transform, force_reload=False),
@@ -55,21 +68,38 @@ def load_bruteforce(transform, cfg=None):
     }
 
 def load_erdosrenyi(transform, cfg=None):
+    root = "data/ErdosRenyi"
     if cfg is not None:
         cfg.multilabel = False
         cfg.classification = False # Regression on number of 4 cycles
+        if cfg.datasetRoot is not None:
+            root = cfg.datasetRoot
+    
     return {
-        "train": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="train", pre_transform=transform, force_reload=True),
-        "test": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="test", pre_transform=transform, force_reload=False),
-        "val": bruteforce.ErdosRenyiDataset(root="data/ErdosRenyi", split="val", pre_transform=transform, force_reload=False),
+        "train": bruteforce.ErdosRenyiDataset(root=root, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.ErdosRenyiDataset(root=root, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.ErdosRenyiDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
 
 def load_sds(transform, cfg=None):
+    root = "data/SameDegreeSequence"
     if cfg is not None:
         cfg.multilabel = False
+        cfg.shuffle = False
         cfg.classification = False # Regression on number of 4 cycles
+        if cfg.datasetRoot is not None:
+            root = cfg.datasetRoot
     return {
-        "train": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="train", pre_transform=transform, force_reload=True),
-        "test": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="test", pre_transform=transform, force_reload=False),
-        "val": bruteforce.SameDegreeSequenceDataset(root="data/SameDegreeSequence", split="val", pre_transform=transform, force_reload=False),
+        "train": bruteforce.SameDegreeSequenceDataset(root=root, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.SameDegreeSequenceDataset(root=root, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.SameDegreeSequenceDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
+
+DATASETS = {
+    "ZINC": load_zinc,
+    "SDS" : load_sds,
+    "ErdosRenyi" : load_erdosrenyi,
+    "Bruteforce" : load_bruteforce,
+    "CSL" : load_csl,
+    "LRGB" : load_lrgb,
+}

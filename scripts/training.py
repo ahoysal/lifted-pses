@@ -66,9 +66,9 @@ def train(model: torch.nn.Module, dataset: tg.Dataset | dict[str, tg.Dataset], c
 
     # create a loader for batching
     trainDataset = dataset if masked else dataset["train"]
-    trainLoader = DataLoader(trainDataset, batch_size=32, shuffle=True)
-    valLoader = DataLoader(trainDataset if masked else dataset["val"], batch_size=32, shuffle=True)
-    testLoader = DataLoader(trainDataset if masked else dataset["test"], batch_size=32, shuffle=True)
+    trainLoader = DataLoader(trainDataset, batch_size=32, shuffle=cfg.shuffle)
+    valLoader = DataLoader(trainDataset if masked else dataset["val"], batch_size=32, shuffle=cfg.shuffle)
+    testLoader = DataLoader(trainDataset if masked else dataset["test"], batch_size=32, shuffle=cfg.shuffle)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
