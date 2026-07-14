@@ -95,6 +95,20 @@ def load_sds(transform, cfg=None):
         "val": bruteforce.SameDegreeSequenceDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
 
+def load_tree(transform, cfg=None, plus_edges=0):
+    root = "data/SameDegreeSequence"
+    if cfg is not None:
+        cfg.multilabel = False
+        cfg.shuffle = False
+        cfg.classification = False # Regression on wiener index
+        if cfg.datasetRoot is not None:
+            root = cfg.datasetRoot
+    return {
+        "train": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="val", pre_transform=transform, force_reload=False),
+    }
+
 DATASETS = {
     "ZINC": load_zinc,
     "SDS" : load_sds,
@@ -102,4 +116,7 @@ DATASETS = {
     "Bruteforce" : load_bruteforce,
     "CSL" : load_csl,
     "LRGB" : load_lrgb,
+    "Tree" : lambda transform, cfg: load_tree(transform=transform, cfg=cfg, plus_edges=0),
+    "Cycles5" : lambda transform, cfg: load_tree(transform=transform, cfg=cfg, plus_edges=5),
+    "Cycles10" : lambda transform, cfg: load_tree(transform=transform, cfg=cfg, plus_edges=10),
 }

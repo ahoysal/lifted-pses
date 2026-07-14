@@ -51,7 +51,7 @@ def run(dataset, model, pse, datasetRoot=None):
         cfg.trials = 1 # we only need one trial
 
     result, plotReturn = experiment.runExperiement(cfg)
-    saveGraph(id, plotReturn, saveTo="results/graphs/sds/%s_%s" % (model, pseString))
+    # saveGraph(id, plotReturn, saveTo="results/graphs/sds/%s_%s" % (model, pseString))
     
     final.append((id, result))
 

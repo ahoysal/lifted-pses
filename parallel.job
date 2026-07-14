@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=16G
 #SBATCH --time=16:00:00
-#SBATCH --array=0-2
+#SBATCH --array=0-20
 #SBATCH --output=results/%A/%j_%a.out
 #SBATCH --error=results/%A/%j_%a.err
 
@@ -21,15 +21,29 @@ mkdir -p results/out results/err
 
 # Format: "Dataset Model PSE"
 CONFIGS=(
-    "-d SDS -m Transformer -r SDS_Transformer_Hodge --HodgePE"
-    "-d SDS -m Transformer -r SDS_Transformer_Hodge_RWPE --HodgePE --RWPE"
-    "-d SDS -m Transformer -r SDS_Transformer_Hodge_LapPE --HodgePE --LapPE"
-    "-d SDS -m Transformer -r SDS_Transformer_Hodge_RWPELiftedRF --HodgePE --RWPELifted"
-    "-d SDS -m GCN -r SDS_GCN_Hodge --HodgePE"
-    "-d SDS -m GCN -r SDS_GCN_Hodge_RWPE --HodgePE --RWPE"
-    "-d SDS -m GCN -r SDS_GCN_Hodge_LapPE --HodgePE --LapPE"
-    "-d SDS -m GCN -r SDS_GCN_Hodge_RWPELiftedRF --HodgePE --RWPELifted"
-    "-d SDS -m Transformer -r SDS_Transformer_RWPE_LapPE --LapPE --RWPE"
+    "-d Tree -m MeanGuesser -r Cycles5_MeanGuesser"
+    "-d Tree -m Transformer -r Tree_Transformer_None"
+    "-d Tree -m Transformer -r Tree_Transformer_Hodge --HodgePE"
+    "-d Tree -m Transformer -r Tree_Transformer_RWPELifted --RWPELifted"
+    "-d Tree -m Transformer -r Tree_Transformer_LapPE --LapPE"
+    "-d Tree -m Transformer -r Tree_Transformer_RWPE --RWPE"
+    "-d Tree -m GCN -r Tree_GCN_None"
+
+    "-d Cycles5 -m MeanGuesser -r Cycles5_MeanGuesser"
+    "-d Cycles5 -m Transformer -r Cycles5_Transformer_None"
+    "-d Cycles5 -m Transformer -r Cycles5_Transformer_Hodge --HodgePE"
+    "-d Cycles5 -m Transformer -r Cycles5_Transformer_RWPELifted --RWPELifted"
+    "-d Cycles5 -m Transformer -r Cycles5_Transformer_LapPE --LapPE"
+    "-d Cycles5 -m Transformer -r Cycles5_Transformer_RWPE --RWPE"
+    "-d Cycles5 -m GCN -r Cycles5_GCN_None"
+
+    "-d Cycles10 -m MeanGuesser -r Cycles10_MeanGuesser"
+    "-d Cycles10 -m Transformer -r Cycles10_Transformer_None"
+    "-d Cycles10 -m Transformer -r Cycles10_Transformer_Hodge --HodgePE"
+    "-d Cycles10 -m Transformer -r Cycles10_Transformer_RWPELifted --RWPELifted"
+    "-d Cycles10 -m Transformer -r Cycles10_Transformer_LapPE --LapPE"
+    "-d Cycles10 -m Transformer -r Cycles10_Transformer_RWPE --RWPE"
+    "-d Cycles10 -m GCN -r Cycles10_GCN_None"
     
     # "-d ZINC -m Transformer -r ZINC_Transformer_RWPELiftedRF_LapPE --LapPE --RWPELifted"
     # "-d ZINC -m Transformer -r ZINC_Transformer_Hodge_RWPELifted --HodgePE --RWPELifted"

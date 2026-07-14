@@ -1,3 +1,5 @@
+import random
+
 import torch
 from torch_geometric.data import InMemoryDataset, Data
 import os.path as osp
@@ -204,6 +206,57 @@ class SameDegreeSequenceDataset(InMemoryDataset):
                     edge_index = from_networkx(nxg).edge_index
 
 
+                
+            # Apply pre-filters and pre-transforms if any are passed
+            if self.pre_filter is not None:
+                data_list = [data for data in data_list if self.pre_filter(data)]
+            if self.pre_transform is not None:
+                data_list = [self.pre_transform(data) for data in data_list]
+
+            # Save the dataset to disk
+            path = osp.join(self.processed_dir, f'{split}.pt')
+            self.save(data_list, path)
+
+class TreeDataset(InMemoryDataset):
+    splits = ["train", "val", "test"]
+
+    def __init__(self, root:str, plus_edges:int=0, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
+        # 'root' is where the dataset will be saved/loaded from
+        assert split in self.splits
+        self.plus_edges = plus_edges
+
+        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
+
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.load(path)
+
+    @property
+    def processed_file_names(self) -> list[str]:
+        return [f"{split}.pt" for split in self.splits]
+
+    def process(self):
+        # This function only runs if 'train.pt' does not exist
+        for split in self.splits:
+            data_list = []
+            
+            print("Generating trees graphs...")
+            num_graphs = 1000 if split == "train" else 200
+            for i in range(num_graphs):
+                num_nodes = torch.randint(10, 30, (1,)).item()
+                
+                tree : networkx.Graph = networkx.random_unlabeled_tree(n=num_nodes)
+
+                nonEdges = list(networkx.non_edges(graph=tree))
+                additionalEdges = random.sample(nonEdges, k=self.plus_edges) if self.plus_edges < len(nonEdges) else nonEdges
+                tree.add_edges_from(additionalEdges)
+
+                y = torch.tensor([networkx.wiener_index(tree)], dtype=torch.float)
+
+                data = from_networkx(tree)
+                data.y = y
+                data.num_nodes = num_nodes
+                
+                data_list.append(data)
                 
             # Apply pre-filters and pre-transforms if any are passed
             if self.pre_filter is not None:
