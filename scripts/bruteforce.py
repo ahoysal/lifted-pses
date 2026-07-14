@@ -1,3 +1,4 @@
+import json
 import random
 
 import torch
@@ -7,217 +8,255 @@ import networkx
 from torch_geometric.utils import to_networkx, from_networkx, to_undirected, remove_self_loops, coalesce
 from torch_geometric.utils import erdos_renyi_graph
 
-def countTriangles(edge_index, num_nodes):
-    # 2. Create the adjacency matrix using the true number of nodes
-    adj = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
-    adj[edge_index[0], edge_index[1]] = 1.0
+from bruteforce_tasks import count_triangles, count_four_cliques, count_four_cycles, wiener_index
 
-    # 3. Count triangles using the formula: trace(A^3) / 6
-    A_cubed = torch.matmul(adj, torch.matmul(adj, adj))
-    triangle_count = A_cubed.diag().sum().item() / 6.0
 
-    return int(round(triangle_count))
+class _ParamsMixin:
+    """Invalidates the processed cache when generation parameters change."""
 
-def countFourCliques(edge_index, num_nodes):
-    # 1. Create the adjacency matrix
-    adj = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
-    adj[edge_index[0], edge_index[1]] = 1.0
-    
-    # Ensure no self-loops, which could artificially inflate the triangle counts
-    adj.fill_diagonal_(0) 
+    def _generation_params(self) -> dict:
+        raise NotImplementedError
 
-    # 2. Build a batched 3D tensor B where B[i] is the adjacency matrix 
-    # of the subgraph induced by the neighborhood of node i.
-    # 
-    # Using PyTorch broadcasting:
-    # - adj.unsqueeze(0) provides the base adjacency matrix (shape 1xNxN).
-    # - adj.unsqueeze(1) and adj.unsqueeze(2) create an outer product mask for 
-    #   each node's connections. B[i, j, k] will be 1 if and only if j and k 
-    #   are connected AND both are connected to i.
-    B = adj.unsqueeze(0) * adj.unsqueeze(1) * adj.unsqueeze(2)
+    def _params_path(self, root: str) -> str:
+        return osp.join(root, 'processed', 'params.json')
 
-    # 3. Batched matrix multiplication to compute B^3 for all neighborhoods at once
-    B_cubed = torch.matmul(B, torch.matmul(B, B))
-    
-    # 4. Count the triangles in each neighborhood using trace(A^3) / 6
-    # B_cubed.diagonal extracts the diagonal for each batched matrix.
-    traces = B_cubed.diagonal(dim1=1, dim2=2).sum(dim=1)
-    triangles_per_node = traces / 6.0
-    
-    # 5. A 4-clique contains 4 nodes, meaning it will be counted as 1 triangle 
-    # in exactly 4 different neighborhoods. Thus, we divide the total sum by 4.
-    four_clique_count = triangles_per_node.sum() / 4.0
+    def _params_match(self, root: str) -> bool:
+        path = self._params_path(root)
+        if not osp.exists(path):
+            return False
+        with open(path) as f:
+            return json.load(f) == self._generation_params()
 
-    return int(round(four_clique_count.item()))
+    def _save_params(self):
+        with open(self._params_path(self.root), 'w') as f:
+            json.dump(self._generation_params(), f, indent=2)
 
-def countFourCycles(edge_index, num_nodes):
-    # 1. Create the adjacency matrix
-    adj = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
-    adj[edge_index[0], edge_index[1]] = 1.0
 
-    # 2. Get A^2 (Number of paths of length 2 between i and j)
-    A_sq = torch.matmul(adj, adj)
-
-    # 3. We only care about distinct nodes (i != j), so zero out the diagonal
-    A_sq.fill_diagonal_(0)
-
-    # 4. For every pair, the number of 4-cycles they form is (A^2_ij choose 2).
-    # Since n choose 2 = (n * (n - 1)) / 2, and we double-count opposite pairs, 
-    # we divide the total sum by 8.
-    four_cycle_count = (A_sq * (A_sq - 1)).sum() / 8.0
-
-    return int(round(four_cycle_count.item()))
-
-class SyntheticDatasetBase(InMemoryDataset):
+class BruteforceDataset(_ParamsMixin, InMemoryDataset):
     splits = ["train", "val", "test"]
 
-    def __init__(self, root:str, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False, cfg=None):
-        # 'root' is where the dataset will be saved/loaded from
+    def __init__(self, root:str, split:str = "train", task_fn=count_triangles, transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
         assert split in self.splits
-        self.cfg = cfg
+        self.task_fn = task_fn
+
+        force_reload = force_reload or not self._params_match(root)
         super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
 
         path = osp.join(self.processed_dir, f'{split}.pt')
         self.load(path)
 
-    @property
-    def processed_dir(self) -> str:
-        if self.cfg is not None:
-            pses = "+".join(self.cfg.pseType)
-        else:
-            pses = "None"
-            
-        return osp.join(self.root, f"processed_{pses}")
+    def _generation_params(self) -> dict:
+        return {"task_fn": self.task_fn.__name__}
 
     @property
     def processed_file_names(self) -> list[str]:
         return [f"{split}.pt" for split in self.splits]
 
     def process(self):
-        # This function only runs if 'train.pt' does not exist
-        raise NotImplementedError
-
-    def saveSplit(self, data_list, split):
-        if self.pre_filter is not None:
-            data_list = [data for data in data_list if self.pre_filter(data)]
-        if self.pre_transform is not None:
-            data_list = [self.pre_transform(data) for data in data_list]
-
-        # Save the dataset to disk
-        path = osp.join(self.processed_dir, f'{split}.pt')
-        self.save(data_list, path)
-
-class BruteforceDataset(SyntheticDatasetBase):
-    splits = ["train", "val", "test"]
-
-    def process(self):
         for split in self.splits:
             data_list = []
-            
+
             print("Generating synthetic graphs...")
             num_graphs = 1000 if split == "train" else 200
-            for i in range(num_graphs):
+            for _ in range(num_graphs):
                 num_nodes = torch.randint(10, 30, (1,)).item()
-                
+
                 edge_index = torch.randint(0, num_nodes, (2, num_nodes * 2), dtype=torch.long)
                 edge_index, _ = remove_self_loops(edge_index)
                 edge_index = coalesce(to_undirected(edge_index))
 
-                y = torch.tensor([countTriangles(edge_index, num_nodes)], dtype=torch.float)
-                
+                y = torch.tensor([self.task_fn(edge_index, num_nodes)], dtype=torch.float)
+
                 data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                 data_list.append(data)
-                
-            self.saveSplit(data_list, split)
 
-class ErdosRenyiDataset(SyntheticDatasetBase):
+            if self.pre_filter is not None:
+                data_list = [data for data in data_list if self.pre_filter(data)]
+            if self.pre_transform is not None:
+                data_list = [self.pre_transform(data) for data in data_list]
+
+            path = osp.join(self.processed_dir, f'{split}.pt')
+            self.save(data_list, path)
+
+        self._save_params()
+
+
+class ErdosRenyiDataset(_ParamsMixin, InMemoryDataset):
     splits = ["train", "val", "test"]
 
+    def __init__(self, root:str, split:str = "train", task_fn=count_four_cycles, transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
+        assert split in self.splits
+        self.task_fn = task_fn
+
+        force_reload = force_reload or not self._params_match(root)
+        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
+
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.load(path)
+
+    def _generation_params(self) -> dict:
+        return {"task_fn": self.task_fn.__name__}
+
+    @property
+    def processed_file_names(self) -> list[str]:
+        return [f"{split}.pt" for split in self.splits]
+
     def process(self):
-        # This function only runs if 'train.pt' does not exist
         for split in self.splits:
             data_list = []
-            
+
             print("Generating synthetic graphs...")
             num_graphs = 1000 if split == "train" else 200
-            for i in range(num_graphs):
+            for _ in range(num_graphs):
                 num_nodes = torch.randint(10, 30, (1,)).item()
 
                 edge_prob = torch.empty(1).uniform_(0.1, 0.5).item()
                 edge_index = erdos_renyi_graph(num_nodes=num_nodes, edge_prob=edge_prob, directed=False)
 
-                y = torch.tensor([countFourCycles(edge_index, num_nodes)], dtype=torch.float)
-                
+                y = torch.tensor([self.task_fn(edge_index, num_nodes)], dtype=torch.float)
+
                 data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                 data_list.append(data)
-                
-            self.saveSplit(data_list, split)
 
-class SameDegreeSequenceDataset(SyntheticDatasetBase):
+            if self.pre_filter is not None:
+                data_list = [data for data in data_list if self.pre_filter(data)]
+            if self.pre_transform is not None:
+                data_list = [self.pre_transform(data) for data in data_list]
+
+            path = osp.join(self.processed_dir, f'{split}.pt')
+            self.save(data_list, path)
+
+        self._save_params()
+
+
+class SameDegreeSequenceDataset(_ParamsMixin, InMemoryDataset):
     splits = ["train", "val", "test"]
 
+    def __init__(self, root:str, split:str = "train", task_fn=count_four_cliques, sequence_length:int = 10, num_train:int = 10000, num_eval:int = 2000, num_nodes_range:tuple = (10, 30), edge_prob_range:tuple = (0.1, 0.5), nswap:int = 1, transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
+        assert split in self.splits
+        self.task_fn = task_fn
+        self.sequence_length = sequence_length
+        self.num_train = num_train
+        self.num_eval = num_eval
+        self.num_nodes_range = num_nodes_range
+        self.edge_prob_range = edge_prob_range
+        self.nswap = nswap
+
+        force_reload = force_reload or not self._params_match(root)
+        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
+
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.load(path)
+
+    def _generation_params(self) -> dict:
+        return {
+            "task_fn": self.task_fn.__name__,
+            "sequence_length": self.sequence_length,
+            "num_train": self.num_train,
+            "num_eval": self.num_eval,
+            "num_nodes_range": list(self.num_nodes_range),
+            "edge_prob_range": list(self.edge_prob_range),
+            "nswap": self.nswap,
+        }
+
+    @property
+    def processed_file_names(self) -> list[str]:
+        return [f"{split}.pt" for split in self.splits]
+
     def process(self):
-        SEQUENCE_LENGTH = 10
-        # This function only runs if 'train.pt' does not exist
         for split in self.splits:
             data_list = []
-            
+
             print("Generating synthetic graphs...")
-            num_graphs = 10000 if split == "train" else 2000
+            num_graphs = self.num_train if split == "train" else self.num_eval
             graphsLeft = num_graphs
 
             while graphsLeft > 0:
-                num_nodes = torch.randint(10, 30, (1,)).item()
-                edge_prob = torch.empty(1).uniform_(0.1, 0.5).item()
+                num_nodes = torch.randint(self.num_nodes_range[0], self.num_nodes_range[1], (1,)).item()
+                edge_prob = torch.empty(1).uniform_(self.edge_prob_range[0], self.edge_prob_range[1]).item()
                 edge_index = erdos_renyi_graph(num_nodes=num_nodes, edge_prob=edge_prob, directed=False)
                 edge_index, _ = remove_self_loops(edge_index)
 
                 data = Data(edge_index=edge_index, num_nodes=num_nodes)
                 nxg = to_networkx(data, to_undirected=True)
 
-                for j in range(min(SEQUENCE_LENGTH, graphsLeft)):
-                    y = torch.tensor([countFourCliques(edge_index, num_nodes)], dtype=torch.float)
+                for _ in range(min(self.sequence_length, graphsLeft)):
+                    y = torch.tensor([self.task_fn(edge_index, num_nodes)], dtype=torch.float)
                     data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                     data_list.append(data)
                     graphsLeft -= 1
 
                     try:
-                        nxg = networkx.double_edge_swap(nxg, nswap=1, max_tries=100)
+                        nxg = networkx.double_edge_swap(nxg, nswap=self.nswap, max_tries=100)
                     except networkx.NetworkXException:
                         break
-                
-                    edge_index = from_networkx(nxg).edge_index
-                
-            self.saveSplit(data_list, split)
 
-class TreeDataset(SyntheticDatasetBase):
+                    edge_index = from_networkx(nxg).edge_index
+
+            if self.pre_filter is not None:
+                data_list = [data for data in data_list if self.pre_filter(data)]
+            if self.pre_transform is not None:
+                data_list = [self.pre_transform(data) for data in data_list]
+
+            path = osp.join(self.processed_dir, f'{split}.pt')
+            self.save(data_list, path)
+
+        self._save_params()
+
+
+class TreeDataset(_ParamsMixin, InMemoryDataset):
     splits = ["train", "val", "test"]
 
-    def __init__(self, root:str, plus_edges:int=0, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False, cfg=None):
+    def __init__(self, root:str, plus_edges:int=0, split:str = "train", task_fn=wiener_index, transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
+        # Note: count_triangles, count_four_cliques, count_four_cycles are always 0
+        # on trees (plus_edges=0) since trees contain no cycles — valid but degenerate.
+        assert split in self.splits
         self.plus_edges = plus_edges
-        super().__init__(root, split, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload, cfg=cfg)
-    
+        self.task_fn = task_fn
+
+        force_reload = force_reload or not self._params_match(root)
+        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
+
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.load(path)
+
+    def _generation_params(self) -> dict:
+        return {
+            "task_fn": self.task_fn.__name__,
+            "plus_edges": self.plus_edges,
+        }
+
+    @property
+    def processed_file_names(self) -> list[str]:
+        return [f"{split}.pt" for split in self.splits]
+
     def process(self):
         for split in self.splits:
             data_list = []
-            
+
             print("Generating trees graphs...")
             num_graphs = 1000 if split == "train" else 200
-            for i in range(num_graphs):
+            for _ in range(num_graphs):
                 num_nodes = torch.randint(10, 30, (1,)).item()
-                
+
                 tree : networkx.Graph = networkx.random_unlabeled_tree(n=num_nodes)
 
                 nonEdges = list(networkx.non_edges(graph=tree))
                 additionalEdges = random.sample(nonEdges, k=self.plus_edges) if self.plus_edges < len(nonEdges) else nonEdges
                 tree.add_edges_from(additionalEdges)
 
-                y = torch.tensor([networkx.wiener_index(tree)], dtype=torch.float)
-
                 data = from_networkx(tree)
-                data.y = y
+                data.y = torch.tensor([self.task_fn(data.edge_index, num_nodes)], dtype=torch.float)
                 data.num_nodes = num_nodes
-                
+
                 data_list.append(data)
-                
-            self.saveSplit(data_list, split)
+
+            if self.pre_filter is not None:
+                data_list = [data for data in data_list if self.pre_filter(data)]
+            if self.pre_transform is not None:
+                data_list = [self.pre_transform(data) for data in data_list]
+
+            path = osp.join(self.processed_dir, f'{split}.pt')
+            self.save(data_list, path)
+
+        self._save_params()
