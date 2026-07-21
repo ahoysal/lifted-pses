@@ -1,0 +1,68 @@
+#!/bin/bash
+#SBATCH --job-name=betti_corr_resume
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:1
+#SBATCH --mem=16G
+#SBATCH --time=12:00:00
+#SBATCH --output=results/%j/%x.out
+#SBATCH --error=results/%j/%x.err
+
+set -euo pipefail
+
+OUTERRFILES="results/${SLURM_JOB_ID}"
+mkdir -p "${OUTERRFILES}"
+
+# -----------------------------------------------------------------------------
+# Environment setup
+# -----------------------------------------------------------------------------
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+
+if [[ -f "${HOME}/.bashrc" ]]; then
+    set +u
+    source "${HOME}/.bashrc"
+    set -u
+fi
+
+if [[ -f "${PROJECT_ROOT}/.venv/bin/activate" ]]; then
+    set +u
+    source "${PROJECT_ROOT}/.venv/bin/activate"
+    set -u
+    echo "Activated virtualenv at ${PROJECT_ROOT}/.venv"
+elif [[ -f "${PROJECT_ROOT}/venv/bin/activate" ]]; then
+    set +u
+    source "${PROJECT_ROOT}/venv/bin/activate"
+    set -u
+    echo "Activated virtualenv at ${PROJECT_ROOT}/venv"
+else
+    echo "Warning: No virtualenv found. Using system Python."
+fi
+
+# -----------------------------------------------------------------------------
+# Run — resume Transformer+RWPELifted and Transformer+Hodge for count_four_cycles
+# -----------------------------------------------------------------------------
+
+cd "${PROJECT_ROOT}"
+
+CONFIG="scripts/caleb_experiments/config_diverse.yaml"
+
+echo "Running betti_correlation.py (resume)"
+echo "Config:  ${CONFIG}"
+echo "Using GPU: ${CUDA_VISIBLE_DEVICES:-none}"
+echo "Python version: $(python3 --version)"
+echo "PyTorch version: $(python3 -c 'import torch; print(torch.__version__)')"
+echo "CUDA available: $(python3 -c 'import torch; print(torch.cuda.is_available())')"
+if python3 -c 'import torch; exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+    echo "CUDA device: $(python3 -c 'import torch; print(torch.cuda.get_device_name(0))')"
+fi
+echo ""
+
+python3 -u scripts/caleb_experiments/betti_correlation.py \
+    --config "${CONFIG}" \
+    --resume \
+    --only-tasks count_four_cycles \
+    --only-models Transformer \
+    --only-encodings RWPELifted Hodge

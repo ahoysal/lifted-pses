@@ -2,4 +2,7 @@
 !.gitignore
 !*.py
 !*.job
+!*.yaml
 !scripts/
+!scripts/*/
+!scripts/*/*.yaml
