@@ -68,17 +68,26 @@ def countFourCycles(edge_index, num_nodes):
 
     return int(round(four_cycle_count.item()))
 
-class BruteforceDataset(InMemoryDataset):
+class SyntheticDatasetBase(InMemoryDataset):
     splits = ["train", "val", "test"]
 
-    def __init__(self, root:str, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
+    def __init__(self, root:str, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False, cfg=None):
         # 'root' is where the dataset will be saved/loaded from
         assert split in self.splits
-
+        self.cfg = cfg
         super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
 
         path = osp.join(self.processed_dir, f'{split}.pt')
         self.load(path)
+
+    @property
+    def processed_dir(self) -> str:
+        if self.cfg is not None:
+            pses = "+".join(self.cfg.pseType)
+        else:
+            pses = "None"
+            
+        return osp.join(self.root, f"processed_{pses}")
 
     @property
     def processed_file_names(self) -> list[str]:
@@ -86,6 +95,22 @@ class BruteforceDataset(InMemoryDataset):
 
     def process(self):
         # This function only runs if 'train.pt' does not exist
+        raise NotImplementedError
+
+    def saveSplit(self, data_list, split):
+        if self.pre_filter is not None:
+            data_list = [data for data in data_list if self.pre_filter(data)]
+        if self.pre_transform is not None:
+            data_list = [self.pre_transform(data) for data in data_list]
+
+        # Save the dataset to disk
+        path = osp.join(self.processed_dir, f'{split}.pt')
+        self.save(data_list, path)
+
+class BruteforceDataset(SyntheticDatasetBase):
+    splits = ["train", "val", "test"]
+
+    def process(self):
         for split in self.splits:
             data_list = []
             
@@ -103,31 +128,10 @@ class BruteforceDataset(InMemoryDataset):
                 data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                 data_list.append(data)
                 
-            # Apply pre-filters and pre-transforms if any are passed
-            if self.pre_filter is not None:
-                data_list = [data for data in data_list if self.pre_filter(data)]
-            if self.pre_transform is not None:
-                data_list = [self.pre_transform(data) for data in data_list]
+            self.saveSplit(data_list, split)
 
-            # Save the dataset to disk
-            path = osp.join(self.processed_dir, f'{split}.pt')
-            self.save(data_list, path)
-
-class ErdosRenyiDataset(InMemoryDataset):
+class ErdosRenyiDataset(SyntheticDatasetBase):
     splits = ["train", "val", "test"]
-
-    def __init__(self, root:str, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
-        # 'root' is where the dataset will be saved/loaded from
-        assert split in self.splits
-
-        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
-
-        path = osp.join(self.processed_dir, f'{split}.pt')
-        self.load(path)
-
-    @property
-    def processed_file_names(self) -> list[str]:
-        return [f"{split}.pt" for split in self.splits]
 
     def process(self):
         # This function only runs if 'train.pt' does not exist
@@ -147,31 +151,10 @@ class ErdosRenyiDataset(InMemoryDataset):
                 data = Data(edge_index=edge_index, y=y, num_nodes=num_nodes)
                 data_list.append(data)
                 
-            # Apply pre-filters and pre-transforms if any are passed
-            if self.pre_filter is not None:
-                data_list = [data for data in data_list if self.pre_filter(data)]
-            if self.pre_transform is not None:
-                data_list = [self.pre_transform(data) for data in data_list]
+            self.saveSplit(data_list, split)
 
-            # Save the dataset to disk
-            path = osp.join(self.processed_dir, f'{split}.pt')
-            self.save(data_list, path)
-
-class SameDegreeSequenceDataset(InMemoryDataset):
+class SameDegreeSequenceDataset(SyntheticDatasetBase):
     splits = ["train", "val", "test"]
-
-    def __init__(self, root:str, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
-        # 'root' is where the dataset will be saved/loaded from
-        assert split in self.splits
-
-        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
-
-        path = osp.join(self.processed_dir, f'{split}.pt')
-        self.load(path)
-
-    @property
-    def processed_file_names(self) -> list[str]:
-        return [f"{split}.pt" for split in self.splits]
 
     def process(self):
         SEQUENCE_LENGTH = 10
@@ -204,38 +187,17 @@ class SameDegreeSequenceDataset(InMemoryDataset):
                         break
                 
                     edge_index = from_networkx(nxg).edge_index
-
-
                 
-            # Apply pre-filters and pre-transforms if any are passed
-            if self.pre_filter is not None:
-                data_list = [data for data in data_list if self.pre_filter(data)]
-            if self.pre_transform is not None:
-                data_list = [self.pre_transform(data) for data in data_list]
+            self.saveSplit(data_list, split)
 
-            # Save the dataset to disk
-            path = osp.join(self.processed_dir, f'{split}.pt')
-            self.save(data_list, path)
-
-class TreeDataset(InMemoryDataset):
+class TreeDataset(SyntheticDatasetBase):
     splits = ["train", "val", "test"]
 
-    def __init__(self, root:str, plus_edges:int=0, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False,):
-        # 'root' is where the dataset will be saved/loaded from
-        assert split in self.splits
+    def __init__(self, root:str, plus_edges:int=0, split:str = "train", transform=None, pre_transform=None, pre_filter=None, force_reload: bool = False, cfg=None):
         self.plus_edges = plus_edges
-
-        super().__init__(root, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload)
-
-        path = osp.join(self.processed_dir, f'{split}.pt')
-        self.load(path)
-
-    @property
-    def processed_file_names(self) -> list[str]:
-        return [f"{split}.pt" for split in self.splits]
-
+        super().__init__(root, split, transform, pre_transform, pre_filter=pre_filter, force_reload=force_reload, cfg=cfg)
+    
     def process(self):
-        # This function only runs if 'train.pt' does not exist
         for split in self.splits:
             data_list = []
             
@@ -258,12 +220,4 @@ class TreeDataset(InMemoryDataset):
                 
                 data_list.append(data)
                 
-            # Apply pre-filters and pre-transforms if any are passed
-            if self.pre_filter is not None:
-                data_list = [data for data in data_list if self.pre_filter(data)]
-            if self.pre_transform is not None:
-                data_list = [self.pre_transform(data) for data in data_list]
-
-            # Save the dataset to disk
-            path = osp.join(self.processed_dir, f'{split}.pt')
-            self.save(data_list, path)
+            self.saveSplit(data_list, split)

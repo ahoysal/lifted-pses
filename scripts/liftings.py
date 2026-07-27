@@ -15,15 +15,14 @@ def find3Cliques(nxg : nx.Graph):
             # Sort to keep unique sets
             triangles.append(tuple(sorted((u, v, w))))
     
-    unique_3cliques = list(set(triangles))
-    return unique_3cliques
+    return triangles
 
 def makeHG(graph : tg.data.BaseData):
     hg = xgi.Hypergraph()
     nxg = to_networkx(graph, to_undirected=True)
-    cliques = find3Cliques(nxg)
     hg.add_nodes_from(nxg.nodes())
     hg.add_edges_from(nxg.edges())
+    hg.add_edges_from(find3Cliques(nxg))
 
     return hg
 

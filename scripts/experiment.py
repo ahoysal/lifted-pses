@@ -26,7 +26,7 @@ def runExperiement(cfg : configs.Configs):
                 case "LapPE":
                     data = pses.addLaplacianPE(data, cfg.rwpe_anchors)
                 case "RWPELifted":
-                    lifted = liftings.makeHGFormanRicci(data)
+                    lifted = liftings.makeHG(data)
                     data = pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
                 case "Hodge":
                     data = pses.addHodgePE(data, cfg.rwpe_anchors)
@@ -40,7 +40,7 @@ def runExperiement(cfg : configs.Configs):
     # Load dataset
     print("Loading dataset...")
     if cfg.dataset not in datasets.DATASETS:
-        print(f"Failed to find dataset {cfg.DATASETS}! Returning.")
+        print(f"Failed to find dataset {cfg.dataset}! Returning.")
         return -1, plotReturn
     dataset = datasets.DATASETS[cfg.dataset](transform=transform, cfg=cfg)
 
@@ -74,6 +74,7 @@ def runExperiement(cfg : configs.Configs):
                 )
                 cfg.staticModel = False
             case "MeanGuesser":
+                print(f"Always predicting {trainDataset.data.y.mean(dim=0)} (stddev {trainDataset.data.y.std(dim=0)})")
                 model = models.MeanGuesser(
                     prediction=trainDataset.data.y.mean(dim=0)
                 )
