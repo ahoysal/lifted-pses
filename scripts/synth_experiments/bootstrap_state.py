@@ -6,7 +6,7 @@ Usage:
   python bootstrap_state.py <results_dir>
 
 Example:
-  python scripts/caleb_experiments/bootstrap_state.py \
+  python scripts/synth_experiments/bootstrap_state.py \
     results/betti_correlation/nTrain8000_nEval8000_seqLen5_nodes14-17_prob0.2-0.3_nswap2
 '''
 

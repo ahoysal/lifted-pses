@@ -25,7 +25,7 @@ mkdir -p "${OUTERRFILES}"
 # Environment setup
 # -----------------------------------------------------------------------------
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u
@@ -53,7 +53,7 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/caleb_experiments/config_controlled_v2.yaml"
+CONFIG="scripts/synth_experiments/config_controlled_v2.yaml"
 RESUME="${RESUME:-}"
 
 echo "Job:     ${SLURM_JOB_ID} (${SLURM_JOB_NAME})"
@@ -77,7 +77,7 @@ echo ""
 # Results appended to results.csv and epoch_losses.csv after every trial/10 epochs
 # -----------------------------------------------------------------------------
 
-python3 -u scripts/caleb_experiments/controlled_synthetic.py \
+python3 -u scripts/synth_experiments/controlled_synthetic.py \
     --config "${CONFIG}" \
     ${RESUME:+--resume}
 

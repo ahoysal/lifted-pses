@@ -14,7 +14,7 @@ set -euo pipefail
 
 mkdir -p "results/${SLURM_JOB_ID}"
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u; source "${HOME}/.bashrc"; set -u
@@ -27,7 +27,7 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/caleb_experiments/config_cycles_wide.yaml"
+CONFIG="scripts/synth_experiments/config_cycles_wide.yaml"
 RESUME="${RESUME:-}"
 
 echo "Job:     ${SLURM_JOB_ID} (${SLURM_JOB_NAME})"
@@ -45,7 +45,7 @@ echo ""
 
 # count_four_cycles, all encodings, wide ER range (nodes 10-30, p 0.1-0.5)
 # Resume: RESUME=1 sbatch cycles_wide.job
-python3 -u scripts/caleb_experiments/controlled_synthetic.py \
+python3 -u scripts/synth_experiments/controlled_synthetic.py \
     --config "${CONFIG}" \
     --out-dir results/cycles_wide \
     --only-tasks count_four_cycles \

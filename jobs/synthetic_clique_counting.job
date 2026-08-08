@@ -1,14 +1,4 @@
 #!/bin/bash
-#SBATCH --job-name=controlled_ablation
-#SBATCH --partition=gpu
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
-#SBATCH --mem=32G
-#SBATCH --time=24:00:00
-#SBATCH --output=results/%j/%x.out
-#SBATCH --error=results/%j/%x.err
 
 set -euo pipefail
 
@@ -24,7 +14,7 @@ mkdir -p "${OUTERRFILES}"
 # Environment setup
 # -----------------------------------------------------------------------------
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u
@@ -52,7 +42,7 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/caleb_experiments/config_controlled_ablation.yaml"
+CONFIG="scripts/synth_experiments/config_controlled_ablation.yaml"
 RESUME="${RESUME:-}"
 
 echo "Job:     ${SLURM_JOB_ID} (${SLURM_JOB_NAME})"
@@ -74,7 +64,7 @@ echo ""
 # Results written to results.csv after every trial
 # -----------------------------------------------------------------------------
 
-python3 -u scripts/caleb_experiments/controlled_synthetic.py \
+python3 -u scripts/synth_experiments/controlled_synthetic.py \
     --config "${CONFIG}" \
     --only-encodings Hodge LapPE None RWPE \
     ${RESUME:+--resume}

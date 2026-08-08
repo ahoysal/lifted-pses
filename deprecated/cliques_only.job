@@ -20,7 +20,7 @@ mkdir -p "${OUTERRFILES}"
 #   cat  results/controlled_synthetic/nTrain5000_nEval1000_seqLen5_nodes18-22_prob0.3-0.4_nswap2/results.csv
 #   cat  results/controlled_synthetic/nTrain5000_nEval1000_seqLen5_nodes18-22_prob0.3-0.4_nswap2/epoch_losses.csv
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u
@@ -44,7 +44,7 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/caleb_experiments/config_controlled_v2.yaml"
+CONFIG="scripts/synth_experiments/config_controlled_v2.yaml"
 RESUME="${RESUME:-}"
 
 echo "Job:     ${SLURM_JOB_ID} (${SLURM_JOB_NAME})"
@@ -63,7 +63,7 @@ echo ""
 # count_four_cliques only, n=[18,22] p=[0.3,0.4]
 # Resume by resubmitting with: RESUME=1 sbatch cliques_only.job
 
-python3 -u scripts/caleb_experiments/controlled_synthetic.py \
+python3 -u scripts/synth_experiments/controlled_synthetic.py \
     --config "${CONFIG}" \
     --only-tasks count_four_cliques \
     ${RESUME:+--resume}

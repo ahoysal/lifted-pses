@@ -19,7 +19,7 @@ mkdir -p "${OUTERRFILES}"
 # Environment setup
 # -----------------------------------------------------------------------------
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u
@@ -49,7 +49,7 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/caleb_experiments/config_diverse_transformer.yaml"
+CONFIG="scripts/synth_experiments/config_diverse_transformer.yaml"
 RESUME="${RESUME:-}"
 
 echo "Running betti_correlation.py (Transformer only)"
@@ -64,7 +64,7 @@ if python3 -c 'import torch; exit(0 if torch.cuda.is_available() else 1)' 2>/dev
 fi
 echo ""
 
-python3 -u scripts/caleb_experiments/betti_correlation.py \
+python3 -u scripts/synth_experiments/betti_correlation.py \
     --config "${CONFIG}" \
     --only-models Transformer \
     ${RESUME:+--resume}

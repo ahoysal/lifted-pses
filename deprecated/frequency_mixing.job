@@ -14,7 +14,7 @@ set -euo pipefail
 
 mkdir -p "results/${SLURM_JOB_ID}"
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
     set +u; source "${HOME}/.bashrc"; set -u
@@ -40,7 +40,7 @@ echo ""
 
 # Full run: 500 graphs, n=20, p=0.35, 150 rewires, 3 trials
 # Results go to results/frequency_mixing/n20_p0.35_g500_r150/
-python3 -u scripts/caleb_experiments/frequency_mixing.py \
+python3 -u scripts/synth_experiments/frequency_mixing.py \
     --n 20 \
     --p 0.35 \
     --num-graphs 500 \
