@@ -7,5 +7,4 @@
 !scripts/*/*.yaml
 !jobs/
 !jobs/*.job
-!deprecated/
-!deprecated/*.job
+!README.md
