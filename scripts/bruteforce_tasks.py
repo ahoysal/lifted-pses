@@ -29,6 +29,54 @@ def count_four_cycles(edge_index, num_nodes):
     return int(round((A_sq * (A_sq - 1)).sum().item() / 8.0))
 
 
+def count_edges_in_exactly_k_triangles(edge_index, num_nodes, k=1):
+    """Count edges that participate in exactly k triangles.
+    Directly readable from B2: edge e is in k triangles iff row e of B2 has k non-zeros.
+    HodgeRandom scrambles this by assigning random edges to each triangle slot,
+    so it cannot recover this quantity even though it preserves the triangle count.
+    """
+    adj = [set() for _ in range(num_nodes)]
+    edges = set()
+    for u, v in edge_index.t().tolist():
+        if u != v:
+            a, b = (u, v) if u < v else (v, u)
+            edges.add((a, b))
+            adj[u].add(v)
+            adj[v].add(u)
+    return sum(1 for (u, v) in edges if len(adj[u] & adj[v]) == k)
+
+
+def make_count_edges_k_triangles(k):
+    """Return a task function (edge_index, num_nodes) -> int for a specific k."""
+    def fn(edge_index, num_nodes):
+        return count_edges_in_exactly_k_triangles(edge_index, num_nodes, k)
+    fn.__name__ = f'count_edges_{k}_triangles'
+    return fn
+
+
+count_edges_1_triangle  = make_count_edges_k_triangles(1)
+count_edges_2_triangles = make_count_edges_k_triangles(2)
+
+
+def count_edges_1_triangle_normalized(edge_index, num_nodes):
+    """Fraction of triangle-participating edges that are in exactly 1 triangle.
+    Independent of total triangle count by construction — HodgeRandom's only leaked
+    signal (triangle count) is divided out, leaving only the overlap structure."""
+    adj = [set() for _ in range(num_nodes)]
+    edges = set()
+    for u, v in edge_index.t().tolist():
+        if u != v:
+            a, b = (u, v) if u < v else (v, u)
+            edges.add((a, b))
+            adj[u].add(v); adj[v].add(u)
+    tri_counts = {e: len(adj[e[0]] & adj[e[1]]) for e in edges}
+    edges_in_any = sum(1 for c in tri_counts.values() if c >= 1)
+    if edges_in_any == 0:
+        return 0.0
+    edges_in_exactly_1 = sum(1 for c in tri_counts.values() if c == 1)
+    return edges_in_exactly_1 / edges_in_any
+
+
 def wiener_index(edge_index, num_nodes):
     # Incompatible with datasets that may produce disconnected graphs
     # (BruteforceDataset, ErdosRenyiDataset, SameDegreeSequenceDataset):

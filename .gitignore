@@ -2,6 +2,13 @@
 !.gitignore
 !*.py
 !*.job
+cliques_cycles_final.job
+cliques_cycles_v2.job
+cliques_only.job
+cycles_only.job
+cycles_wide.job
+frequency_mixing.job
+hodge_edge_tri.job
 !*.yaml
 !scripts/
 !scripts/*/

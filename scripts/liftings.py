@@ -100,6 +100,39 @@ def build_hodge_matrices(data: tg.Data, max_edges: int) -> dict[str, object]:
         "upper": upper,
     }
 
+def build_hodge_matrices_randomized(data: tg.Data, max_edges: int, rng=None) -> dict[str, object]:
+    """
+    Randomized control for build_hodge_matrices. Computes the real clique complex to get
+    B1 and the triangle count t, then replaces each 2-simplex with a random triple of edges
+    (with random ±1 orientations), producing a structurally invalid but size-matched B2.
+    This isolates whether the benefit of HodgePE comes from the geometric specificity of
+    the clique complex rather than from the mere presence of higher-order cells.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    built = build_hodge_matrices(data, max_edges)
+    if not built:
+        return built
+
+    m = built["m"]
+    t = len(built["triangles"])
+
+    B2_random = np.zeros((m, t), dtype=np.float64)
+    for col in range(t):
+        chosen = rng.choice(m, size=3, replace=False)
+        signs = rng.choice([-1.0, 1.0], size=3)
+        for edge_idx, sign in zip(chosen, signs):
+            B2_random[edge_idx, col] = sign
+
+    upper = B2_random @ B2_random.T if t > 0 else np.zeros((m, m), dtype=np.float64)
+    result = dict(built)
+    result["B2"] = B2_random
+    result["upper"] = upper
+    result["L1"] = built["lower"] + upper
+    return result
+
+
 def compute_forman_ricci_curvature(G: nx.Graph):
     """
     Computes Forman-Ricci Curvature for unweighted graphs.
@@ -134,6 +167,39 @@ def get_components_by_curvature(G: nx.Graph, curvatures: dict, theta: float, geq
     # Filter out components with size < 2 (isolated nodes in the subgraph don't form hyperedges)
     components = [list(c) for c in nx.connected_components(subgraph) if len(c) > 1]
     return components
+
+def makeHGFormanRicciRandomized(graph: tg.data.BaseData, quantile_p: float = 0.5, rng=None):
+    """
+    Randomized control for makeHGFormanRicci. Computes the true Forman-Ricci lift to
+    obtain the hyperedge size distribution, then replaces each hyperedge's node membership
+    with a uniformly random sample of the same size. Original pairwise edges are preserved.
+    This isolates whether the benefit of RWPELifted comes from meaningful curvature-derived
+    structure rather than from the mere presence of higher-order cells.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    hg = xgi.Hypergraph()
+    nxg = to_networkx(graph, to_undirected=True)
+    nodes = list(nxg.nodes())
+    hg.add_nodes_from(nodes)
+
+    curvatures = compute_forman_ricci_curvature(nxg)
+    if not curvatures:
+        hg.add_edges_from(nxg.edges())
+        return hg
+
+    theta = np.quantile(list(curvatures.values()), quantile_p)
+    clusters  = get_components_by_curvature(nxg, curvatures, theta, geq=True)
+    backbones = get_components_by_curvature(nxg, curvatures, theta, geq=False)
+
+    for component in clusters + backbones:
+        size = min(len(component), len(nodes))
+        hg.add_edge(rng.choice(nodes, size=size, replace=False).tolist())
+
+    hg.add_edges_from(nxg.edges())
+    return hg
+
 
 def makeHGFormanRicci(graph: tg.data.BaseData, quantile_p: float = 0.5):
     """

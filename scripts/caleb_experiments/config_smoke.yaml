@@ -1,0 +1,28 @@
+dataset:
+  root: data/SameDegreeSequence_smoke
+  num_train: 100
+  num_eval: 40
+  sequence_length: 5
+  num_nodes_range: [8, 12]
+  edge_prob_range: [0.2, 0.3]
+  nswap: 2
+
+model:
+  embedded: 16
+  heads: 2
+  layers: 2
+  dropout: 0.1
+
+training:
+  epochs: 3
+  lr: 0.001
+  batch_size: 32
+  trials: 2
+
+encoding:
+  pe_len: 4
+  rwpe_anchors: 4
+  rwpe_len: 2
+
+output:
+  results_dir: results/smoke_test
