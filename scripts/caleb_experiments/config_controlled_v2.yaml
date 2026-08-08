@@ -1,0 +1,29 @@
+dataset:
+  root: data/SameDegreeSequence_controlled
+  num_train: 5000
+  num_eval: 1000
+  sequence_length: 5
+  num_nodes_range: [18, 22]
+  edge_prob_range: [0.3, 0.4]
+  nswap: 2
+
+model:
+  embedded: 64
+  heads: 4
+  layers: 3
+  dropout: 0.1
+
+training:
+  epochs: 100
+  lr: 0.001
+  batch_size: 256
+  trials: 5
+  patience: 20
+
+encoding:
+  pe_len: 8
+  rwpe_anchors: 16
+  rwpe_len: 3
+
+output:
+  results_dir: results/controlled_synthetic

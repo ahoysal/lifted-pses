@@ -261,6 +261,29 @@ def addHodgePE(data, PElen):
     data.x = torch.cat([data.x, pses], dim=1)
     return data
 
+def addHodgePERandomized(data, PElen, rng=None):
+    built = liftings.build_hodge_matrices_randomized(data, 500, rng=rng)
+    n = int(data.num_nodes)
+    if not built:
+        pses = torch.zeros((n, PElen), dtype=torch.float32)
+    else:
+        L1 = built["L1"]
+        edges = built["edges"]
+        try:
+            evals, evecs = np.linalg.eigh(L1)
+            idx = np.argsort(evals)
+            evals, evecs = evals[idx], evecs[:, idx]
+            pos = np.where(evals > 1e-7)[0]
+            chosen = pos[:PElen]
+            edge_feat = np.zeros((built["m"], PElen), dtype=np.float64)
+            for j, c in enumerate(chosen):
+                edge_feat[:, j] = np.abs(evecs[:, c])
+            pses = project_edge_features_to_nodes(n, edges, edge_feat)
+        except Exception:
+            pses = torch.zeros((n, PElen), dtype=torch.float32)
+    data.x = torch.cat([data.x, pses], dim=1)
+    return data
+
 def addLaplacianPE(data, PElen):
     totalNodes = data.x.shape[-2]
     trueLen = min(PElen, totalNodes - 1)
