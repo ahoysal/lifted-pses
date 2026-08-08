@@ -62,9 +62,9 @@ def load_bruteforce(transform, cfg=None):
             root = cfg.datasetRoot
     
     return {
-        "train": bruteforce.BruteforceDataset(root="data/Bruteforce", split="train", pre_transform=transform, force_reload=True, cfg=cfg),
-        "test": bruteforce.BruteforceDataset(root="data/Bruteforce", split="test", pre_transform=transform, force_reload=False, cfg=cfg),
-        "val": bruteforce.BruteforceDataset(root="data/Bruteforce", split="val", pre_transform=transform, force_reload=False, cfg=cfg),
+        "train": bruteforce.BruteforceDataset(root=root, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.BruteforceDataset(root=root, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.BruteforceDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
 
 def load_erdosrenyi(transform, cfg=None):
@@ -76,9 +76,9 @@ def load_erdosrenyi(transform, cfg=None):
             root = cfg.datasetRoot
     
     return {
-        "train": bruteforce.ErdosRenyiDataset(root=root, split="train", pre_transform=transform, force_reload=True, cfg=cfg),
-        "test": bruteforce.ErdosRenyiDataset(root=root, split="test", pre_transform=transform, force_reload=False, cfg=cfg),
-        "val": bruteforce.ErdosRenyiDataset(root=root, split="val", pre_transform=transform, force_reload=False, cfg=cfg),
+        "train": bruteforce.ErdosRenyiDataset(root=root, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.ErdosRenyiDataset(root=root, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.ErdosRenyiDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
 
 def load_sds(transform, cfg=None):
@@ -90,9 +90,9 @@ def load_sds(transform, cfg=None):
         if cfg.datasetRoot is not None:
             root = cfg.datasetRoot
     return {
-        "train": bruteforce.SameDegreeSequenceDataset(root=root, split="train", pre_transform=transform, force_reload=True, cfg=cfg),
-        "test": bruteforce.SameDegreeSequenceDataset(root=root, split="test", pre_transform=transform, force_reload=False, cfg=cfg),
-        "val": bruteforce.SameDegreeSequenceDataset(root=root, split="val", pre_transform=transform, force_reload=False, cfg=cfg),
+        "train": bruteforce.SameDegreeSequenceDataset(root=root, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.SameDegreeSequenceDataset(root=root, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.SameDegreeSequenceDataset(root=root, split="val", pre_transform=transform, force_reload=False),
     }
 
 def load_tree(transform, cfg=None, plus_edges=0):
@@ -104,9 +104,9 @@ def load_tree(transform, cfg=None, plus_edges=0):
         if cfg.datasetRoot is not None:
             root = cfg.datasetRoot
     return {
-        "train": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="train", pre_transform=transform, force_reload=True, cfg=cfg),
-        "test": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="test", pre_transform=transform, force_reload=False, cfg=cfg),
-        "val": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="val", pre_transform=transform, force_reload=False, cfg=cfg),
+        "train": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="train", pre_transform=transform, force_reload=True),
+        "test": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="test", pre_transform=transform, force_reload=False),
+        "val": bruteforce.TreeDataset(root=root, plus_edges=plus_edges, split="val", pre_transform=transform, force_reload=False),
     }
 
 DATASETS = {
