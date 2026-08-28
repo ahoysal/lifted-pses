@@ -1,3 +1,4 @@
+import time
 import torch
 import numpy as np
 
@@ -30,6 +31,12 @@ def runExperiement(cfg : configs.Configs):
                     data = pses.addRWPE(data, cfg.rwpe_anchors, cfg.rwpe_len, lifted)
                 case "Hodge":
                     data = pses.addHodgePE(data, cfg.rwpe_anchors)
+                case "HodgeLower":
+                    data = pses.addHodgePELower(data, cfg.rwpe_anchors)
+                case "NodeTriCount":
+                    data = pses.addNodeTriCount(data)
+                case "EdgeTriAgg":
+                    data = pses.addEdgeTriAgg(data)
                 case "None":
                     pass
                 case _:
@@ -37,19 +44,23 @@ def runExperiement(cfg : configs.Configs):
         
         return data
 
-    # Load dataset
+    # Load dataset (PSE computation happens here via pre_transform)
     print("Loading dataset...")
     if cfg.dataset not in datasets.DATASETS:
         print(f"Failed to find dataset {cfg.dataset}! Returning.")
         return -1, plotReturn
+    t0_pse = time.perf_counter()
     dataset = datasets.DATASETS[cfg.dataset](transform=transform, cfg=cfg)
+    pse_time = time.perf_counter() - t0_pse
 
     trainDataset = dataset["train"] if isinstance(dataset, dict) else dataset
     print("Dataset loaded. Num graphs: %d, Num features: %d, Num classes: %d" % (len(trainDataset), trainDataset.num_features, trainDataset.num_classes))
+    print(f"TIMING  pse_load={pse_time:.1f}s  (includes PSE pre_transform on train split; 0 if cached)")
 
     plotReturn = np.empty((2, cfg.trials, cfg.epochs)) # two channels for loss and val.
     out_dim = trainDataset.num_classes if cfg.classification else 1
 
+    trial_train_times = []
     metrics = np.empty(cfg.trials)
     for i in range(cfg.trials):
         print("Trial %d:" % i)
@@ -61,7 +72,8 @@ def runExperiement(cfg : configs.Configs):
                     nhead=cfg.heads,
                     num_layers=cfg.layers,
                     out_dim=out_dim,
-                    dropout=cfg.dropout
+                    dropout=cfg.dropout,
+                    bond_dim=cfg.bond_dim,
                 )
                 cfg.staticModel = False
             case "GCN":
@@ -84,15 +96,22 @@ def runExperiement(cfg : configs.Configs):
                 return -1, plotReturn
 
         print("Training... (%d parameters)" % (sum(p.numel() for p in model.parameters() if p.requires_grad)))
+        t0_train = time.perf_counter()
         metrics[i], lossGraph, valGraph = training.train(model, dataset, cfg)
+        train_time = time.perf_counter() - t0_train
+        trial_train_times.append(train_time)
         plotReturn[0, i, :] = lossGraph
         plotReturn[1, i, :] = valGraph
+        print(f"TIMING  trial={i}  train={train_time:.1f}s")
 
         model.cpu()
         # validation.validateOnRS(model, "cpu", transform)
-    
+
+    total_train = sum(trial_train_times)
+    total = pse_time + total_train
     print("Summary: mean %f, stddev %f." % (metrics.mean(), metrics.std()))
     print("\t", metrics)
+    print(f"TIMING SUMMARY  pse={pse_time:.1f}s  train_all_trials={total_train:.1f}s  total={total:.1f}s")
     return metrics, plotReturn
 
 if __name__ == '__main__':

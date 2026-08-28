@@ -17,6 +17,11 @@ class Configs():
         self.rwpe_anchors = 20
         self.rwpe_len = 3
 
+        # Edge feature dimension for bond-conditioned attention.
+        # 0 = disabled (default, reproduces all existing results exactly).
+        # Set to 4 for ZINC (single/double/triple/aromatic bond types).
+        self.bond_dim = 0
+
         # can be of type "ZINC", "SDS", "ErdosRenyi", "Bruteforce"
         self.dataset = "ZINC"
         self.classification = True

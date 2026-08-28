@@ -63,6 +63,8 @@ def build_hodge_matrices(data: tg.Data, max_edges: int) -> dict[str, object]:
     edges = unique_undirected_edges(data.edge_index, n)
     m = len(edges)
     if n == 0 or m == 0 or m > max_edges:
+        if m > max_edges:
+            print(f"Warning: build_hodge_matrices skipping graph with {m} edges (max_edges={max_edges}); returning empty. HodgePE will be zero for this graph.")
         return {}
 
     edge_to_idx = {e: i for i, e in enumerate(edges)}

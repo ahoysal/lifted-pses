@@ -4,10 +4,19 @@ set -euo pipefail
 
 mkdir -p "results/${SLURM_JOB_ID}"
 
-PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
+# Capture all stdout and stderr to persistent log files for this job.
+exec > >(tee -a "results/${SLURM_JOB_ID}/hodge_edge_tri.out") \
+     2> >(tee -a "results/${SLURM_JOB_ID}/hodge_edge_tri.err" >&2)
+
+# Monitor progress:
+#   tail -f results/${SLURM_JOB_ID}/hodge_edge_tri.err   <- tqdm bars + per-trial lines
+#   tail -f results/${SLURM_JOB_ID}/hodge_edge_tri.out   <- startup info + timing summary
+#   cat  results/hodge_edge_tri/*/results.csv             <- saved results so far
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
-    set +u; source "${HOME}/.bashrc"; set -u
+    set +eu; source "${HOME}/.bashrc"; set -eu
 fi
 
 if [[ -f "${PROJECT_ROOT}/.venv/bin/activate" ]]; then

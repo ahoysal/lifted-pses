@@ -261,6 +261,31 @@ def addHodgePE(data, PElen):
     data.x = torch.cat([data.x, pses], dim=1)
     return data
 
+def hodge_eigen_pe_lower(data: Data, dim: int, max_edges: int) -> torch.Tensor:
+    """Smallest non-harmonic eigenvectors of the lower Hodge Laplacian (B1^T B1 only), projected to nodes."""
+    n = int(data.num_nodes)
+    built = liftings.build_hodge_matrices(data, max_edges)
+    if not built:
+        return torch.zeros((n, dim), dtype=torch.float32)
+    edges = built["edges"]
+    try:
+        evals, evecs = np.linalg.eigh(built["lower"])
+        idx = np.argsort(evals)
+        evals, evecs = evals[idx], evecs[:, idx]
+        pos = np.where(evals > 1e-7)[0]
+        chosen = pos[:dim]
+        edge_feat = np.zeros((built["m"], dim), dtype=np.float64)
+        for j, c in enumerate(chosen):
+            edge_feat[:, j] = np.abs(evecs[:, c])
+        return project_edge_features_to_nodes(n, edges, edge_feat)
+    except Exception:
+        return torch.zeros((n, dim), dtype=torch.float32)
+
+def addHodgePELower(data, PElen):
+    pses = hodge_eigen_pe_lower(data, PElen, 500)
+    data.x = torch.cat([data.x, pses], dim=1)
+    return data
+
 def addHodgePERandomized(data, PElen, rng=None):
     built = liftings.build_hodge_matrices_randomized(data, 500, rng=rng)
     n = int(data.num_nodes)
@@ -331,4 +356,62 @@ def addRWPE(data, rw_anchors, rw_len, over):
     data.x = data.x.float()
     pse = _randomWalk(rw_anchors, data.num_nodes, rw_len, over)
     data.x = torch.cat([data.x, pse], dim=1)
+    return data
+
+
+def _build_adj_sparse(data):
+    """Return (A_csr, n, src_np, dst_np) for the graph in data."""
+    from scipy.sparse import csr_matrix
+    n = int(data.num_nodes)
+    src = data.edge_index[0].numpy()
+    dst = data.edge_index[1].numpy()
+    A = csr_matrix((np.ones(len(src), dtype=np.float64), (src, dst)), shape=(n, n))
+    return A, n, src, dst
+
+
+def addNodeTriCount(data):
+    """
+    Append log1p(diag(A^3)/2) as a 1-D node feature.
+    diag(A^3)[i]/2 = number of triangles node i participates in.
+    """
+    A, n, src, dst = _build_adj_sparse(data)
+    A2 = A @ A
+    # diag(A^3)[i] = sum_j A[i,j] * A^2[i,j]  (A symmetric => A^2 symmetric)
+    tri_diag = np.asarray(A.multiply(A2).sum(axis=1)).flatten()
+    tri_count = tri_diag / 2.0
+    feat = np.log1p(tri_count).reshape(-1, 1).astype(np.float32)
+    data.x = torch.cat([data.x, torch.from_numpy(feat)], dim=1)
+    return data
+
+
+def addEdgeTriAgg(data):
+    """
+    For each edge (i,j): edge_tri = |N(i) ∩ N(j)| = A^2[i,j].
+    Per node, aggregate incident edge triangle counts into 4 features:
+      [log1p(sum), log1p(mean), log1p(max), count_with_tri_>=1]
+    """
+    A, n, src, dst = _build_adj_sparse(data)
+    A2 = A @ A
+    edge_tri = np.asarray(A2[src.copy(), dst.copy()]).flatten().astype(np.float64)
+
+    node_sum = np.zeros(n, dtype=np.float64)
+    node_max = np.zeros(n, dtype=np.float64)
+    node_deg = np.zeros(n, dtype=np.float64)
+    node_cnt = np.zeros(n, dtype=np.float64)
+
+    np.add.at(node_sum, src, edge_tri)
+    np.maximum.at(node_max, src, edge_tri)
+    np.add.at(node_deg, src, 1.0)
+    np.add.at(node_cnt, src, (edge_tri >= 1.0).astype(np.float64))
+
+    node_mean = np.where(node_deg > 0, node_sum / node_deg, 0.0)
+
+    feat = np.stack([
+        np.log1p(node_sum),
+        np.log1p(node_mean),
+        np.log1p(node_max),
+        node_cnt,
+    ], axis=1).astype(np.float32)
+
+    data.x = torch.cat([data.x, torch.from_numpy(feat)], dim=1)
     return data

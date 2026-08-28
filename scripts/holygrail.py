@@ -29,7 +29,7 @@ def saveGraph(name, plotReturn, saveTo="results/graphs/default"):
     plt.savefig(f"{saveTo}.png")
     plt.close()
 
-def run(dataset, model, pse, datasetRoot=None):
+def run(dataset, model, pse, datasetRoot=None, bond_dim=0):
     import experiment
     pseString = "+".join(pse)
     id = "%s with %s" % (model, pseString)
@@ -40,6 +40,7 @@ def run(dataset, model, pse, datasetRoot=None):
     cfg.modelType = model
     cfg.pseType = pse
     cfg.trials = 5
+    cfg.bond_dim = bond_dim
 
     cfg.datasetRoot = datasetRoot
 
@@ -70,6 +71,12 @@ parser.add_argument("--HodgePE", action="store_true", help="Include Hodge Laplac
 parser.add_argument("--RWPE", action="store_true", help="Include RWPEs in PSEs")
 parser.add_argument("--LapPE", action="store_true", help="Include LapPE in PSEs")
 parser.add_argument("--RWPELifted", action="store_true", help="Include RWPELifted in PSEs")
+parser.add_argument("--HodgeLowerPE", action="store_true", help="Include lower Hodge Laplacian PE (B1^T B1 only, no upper term)")
+parser.add_argument("--NodeTriCount", action="store_true", help="Include per-node triangle count (log1p-scaled scalar)")
+parser.add_argument("--EdgeTriAgg", action="store_true", help="Include per-node edge triangle aggregation (4-d: log1p sum/mean/max + count)")
+parser.add_argument("--bond-dim", type=int, default=0,
+                    help="Edge-type embedding dimension for bond-conditioned attention. "
+                         "0=disabled (default). Set to 4 for ZINC (single/double/triple/aromatic).")
 
 args = parser.parse_args()
 
@@ -82,8 +89,14 @@ if args.LapPE:
     pse.append("LapPE")
 if args.RWPELifted:
     pse.append("RWPELifted")
+if args.HodgeLowerPE:
+    pse.append("HodgeLower")
+if args.NodeTriCount:
+    pse.append("NodeTriCount")
+if args.EdgeTriAgg:
+    pse.append("EdgeTriAgg")
 
-print(f"Running dataset {args.dataset} with model {args.model} and pses {pse}, datasetRoot = {args.dsroot}.")
-run(args.dataset, args.model, pse, args.dsroot)
+print(f"Running dataset {args.dataset} with model {args.model} and pses {pse}, datasetRoot = {args.dsroot}, bond_dim = {args.bond_dim}.")
+run(args.dataset, args.model, pse, args.dsroot, bond_dim=args.bond_dim)
 
 printStats(final)

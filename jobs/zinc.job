@@ -2,28 +2,26 @@
 
 set -euo pipefail
 
-OUTERRFILES="results/${SLURM_JOB_ID}"
-mkdir -p "${OUTERRFILES}"
-
-# Capture all stdout and stderr to persistent log files for this job.
-exec > >(tee -a "${OUTERRFILES}/controlled_ablation.out") \
-     2> >(tee -a "${OUTERRFILES}/controlled_ablation.err" >&2)
-
+# Reproduces Table 3 (ZINC penalized logP, test MAE) from the paper.
+# Runs four encodings sequentially — No PSE, LapPE, RWPE, Hodge — each for
+# 5 independent trials, using the default Transformer config (Appendix A.2):
+#   d_model=128, heads=2, layers=2, dropout=0.2, epochs=300, batch=32, lr=1e-3
+#   K=20 eigenvectors/anchors for all encodings.
+#
 # Monitor progress:
-#   tail -f results/${SLURM_JOB_ID}/controlled_ablation.err   <- tqdm bars + per-trial lines
-#   tail -f results/${SLURM_JOB_ID}/controlled_ablation.out   <- startup info
-#   cat  results/controlled_synthetic/*/results.csv            <- saved results so far
+#   tail -f results/${SLURM_JOB_ID}/zinc_<encoding>.out
+# Final per-trial and summary stats are printed at the end of each block.
 
 # -----------------------------------------------------------------------------
 # Environment setup
 # -----------------------------------------------------------------------------
 
-PROJECT_ROOT="${PROJECT_ROOT:-/home/cstam5916/lifted-pses}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
 
 if [[ -f "${HOME}/.bashrc" ]]; then
-    set +eu
+    set +u
     source "${HOME}/.bashrc"
-    set -eu
+    set -u
 fi
 
 if [[ -f "${PROJECT_ROOT}/.venv/bin/activate" ]]; then
@@ -46,13 +44,12 @@ fi
 
 cd "${PROJECT_ROOT}"
 
-CONFIG="scripts/synth_experiments/config_controlled_ablation.yaml"
-RESUME="${RESUME:-}"
+OUTDIR="results/${SLURM_JOB_ID}"
+mkdir -p "${OUTDIR}"
 
 echo "Job:     ${SLURM_JOB_ID} (${SLURM_JOB_NAME})"
 echo "Node:    ${SLURMD_NODENAME:-unknown}"
-echo "Config:  ${CONFIG}"
-echo "Resume:  ${RESUME:-(no)}"
+echo "Outdir:  ${OUTDIR}"
 echo "Python:  $(python3 --version)"
 echo "PyTorch: $(python3 -c 'import torch; print(torch.__version__)')"
 echo "CUDA:    $(python3 -c 'import torch; print(torch.cuda.is_available())')"
@@ -63,15 +60,23 @@ echo "Start:   $(date)"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Run — all tasks × {Hodge, LapPE, None, RWPE} × 5 trials, Transformer only
-# Resume by resubmitting with RESUME=1 sbatch controlled_ablation.job
-# Results written to results.csv after every trial
+# Run — {No PSE, LapPE, RWPE, Hodge, HodgeBond} × 5 trials on ZINC subset
+# Each encoding logs to its own file under results/${SLURM_JOB_ID}/
 # -----------------------------------------------------------------------------
 
-python3 -u scripts/synth_experiments/controlled_synthetic.py \
-    --config "${CONFIG}" \
-    --only-encodings Hodge LapPE None RWPE \
-    ${RESUME:+--resume}
+run_encoding() {
+    local name="$1"
+    shift
+    echo "===== ${name} — $(date) ====="
+    python3 -u scripts/holygrail.py -d ZINC -m Transformer "$@" \
+        2>&1 | tee "${OUTDIR}/zinc_${name}.out"
+    echo ""
+}
 
-echo ""
+run_encoding "NoPSE"
+run_encoding "LapPE"        --LapPE
+run_encoding "RWPE"         --RWPE
+run_encoding "Hodge"        --HodgePE
+run_encoding "HodgeBond"    --HodgePE --bond-dim 4
+
 echo "End: $(date)"

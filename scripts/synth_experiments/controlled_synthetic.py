@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import argparse
 import csv
+import time
 import yaml
 import torch
 import torch.nn as nn
@@ -29,7 +30,7 @@ from torch_geometric.loader import DataLoader
 from bruteforce import SameDegreeSequenceDataset
 from bruteforce_tasks import count_four_cycles, count_four_cliques, count_edges_1_triangle_normalized
 from models import GraphNodeTransformer
-from pses import addRWPE, addLaplacianPE, addHodgePE, addHodgePERandomized
+from pses import addRWPE, addLaplacianPE, addHodgePE, addHodgePERandomized, addNodeTriCount, addEdgeTriAgg
 from liftings import makeHGFormanRicci, makeHGFormanRicciRandomized
 
 
@@ -83,6 +84,10 @@ def make_transform(enc_type: str, enc_cfg: dict):
             data = addHodgePE(data, enc_cfg['pe_len'])
         elif enc_type == "HodgeRandom":
             data = addHodgePERandomized(data, enc_cfg['pe_len'])
+        elif enc_type == "NodeTriCount":
+            data = addNodeTriCount(data)
+        elif enc_type == "EdgeTriAgg":
+            data = addEdgeTriAgg(data)
         return data
     return transform
 
@@ -323,6 +328,7 @@ def main():
     print("Loading datasets (all task × encoding combinations)...")
     train_base, val_base = load_base_splits(ds_cfg)
     loaders = {}
+    pse_times = {}  # (task_name, enc) -> wall-clock seconds for PSE precomputation
     for task in active_tasks:
         tqdm.write(f"  Precomputing labels for {task['name']}...")
         train_labels = _precompute_labels(train_base, task['fn'])
@@ -331,15 +337,19 @@ def main():
         for enc in active_encodings:
             transform = make_transform(enc, enc_cfg)
             train_ds, val_ds = load_splits(train_base, val_base, task['fn'], train_labels, val_labels, transform)
+            t0_pse = time.perf_counter()
             if enc in PRECOMPUTE_ENCS:
                 tqdm.write(f"  Precomputing {enc} PE for {task['name']}...")
                 train_ds = [train_ds[i] for i in range(len(train_ds))]
                 val_ds   = [val_ds[i]   for i in range(len(val_ds))]
                 tqdm.write(f"  Done.")
+            pse_times[(task['name'], enc)] = time.perf_counter() - t0_pse
             train_loader = DataLoader(train_ds, batch_size=tr_cfg['batch_size'], shuffle=True)
             val_loader   = DataLoader(val_ds,   batch_size=tr_cfg['batch_size'], shuffle=False)
             loaders[(task['name'], enc)] = (train_ds, train_loader, val_loader)
     print("Datasets ready.\n")
+
+    train_times = {}  # (task_name, enc) -> list of per-trial wall-clock seconds
 
     trial_bar = tqdm(range(n_trials), desc="Trials", position=0, leave=True, unit="trial")
     for trial in trial_bar:
@@ -376,20 +386,49 @@ def main():
                     total=tr_cfg['epochs'], desc="      Epochs",
                     position=3, leave=False, unit="ep",
                 )
+                t0_train = time.perf_counter()
                 val_mae = train_one_trial(
                     model, train_loader, val_loader, tr_cfg, device, epoch_bar,
                     on_epoch_log=make_epoch_logger(task_name, enc, trial),
                 )
+                train_elapsed = time.perf_counter() - t0_train
                 epoch_bar.close()
 
+                train_times.setdefault((task_name, enc), []).append(train_elapsed)
                 append_row(csv_path, task_name, enc, trial, val_mae)
                 completed.add((task_name, enc, trial))
-                tqdm.write(f"  trial={trial}  {task_name} / {enc:<20}  val_mae={val_mae:.4f}")
+
+                pse_t = pse_times.get((task_name, enc), 0.0)
+                pse_label = f"{pse_t:.1f}s" if enc in PRECOMPUTE_ENCS else f"lazy({pse_t:.2f}s)"
+                tqdm.write(
+                    f"  trial={trial}  {task_name} / {enc:<22}  val_mae={val_mae:.4f}"
+                    f"  TIMING pse={pse_label}  train={train_elapsed:.1f}s"
+                )
 
             enc_bar.close()
         task_bar.close()
     trial_bar.close()
     tqdm.write(f"\nDone. Results: {csv_path}")
+
+    # ── Timing summary ────────────────────────────────────────────────────────
+    tqdm.write("\nTIMING SUMMARY (wall-clock seconds)")
+    tqdm.write(f"  PSE note: precomputed encodings {sorted(PRECOMPUTE_ENCS)} timed at dataset load.")
+    tqdm.write(f"  For other encodings PSE is applied lazily per-batch; time is included in training.")
+    hdr = f"  {'task':<36} {'encoding':<22} {'pse(s)':>8} {'train_total(s)':>14} {'overall(s)':>11}"
+    tqdm.write(hdr)
+    tqdm.write("  " + "-" * (len(hdr) - 2))
+    for task in active_tasks:
+        for enc in active_encodings:
+            key = (task['name'], enc)
+            pse_t = pse_times.get(key, 0.0)
+            trials_t = train_times.get(key, [])
+            total_train = sum(trials_t)
+            overall = pse_t + total_train
+            pse_str = f"{pse_t:.1f}" if enc in PRECOMPUTE_ENCS else f"({pse_t:.2f})*"
+            tqdm.write(
+                f"  {task['name']:<36} {enc:<22} {pse_str:>8} {total_train:>14.1f} {overall:>11.1f}"
+            )
+    tqdm.write("  * lazy: PSE time is negligible overhead; actual compute embedded in training total.")
 
 
 if __name__ == "__main__":
